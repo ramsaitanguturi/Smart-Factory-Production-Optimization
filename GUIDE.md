@@ -497,6 +497,19 @@ python capture_all_screenshots.py
 ```
 The script will automatically launch a headless browser, navigate through each view, trigger optimizations, and save fresh PNG files to `docs/screenshots/`.
 
+### Q5: How do I deploy this system to Streamlit Community Cloud?
+**A:** The repository includes complete deployment configurations:
+- [requirements.txt](file:///c:/Users/ramsa/Desktop/Smart%20Factory%20Production%20Optimization/requirements.txt): Pinned runtime dependencies (`streamlit`, `plotly`, `scikit-learn`, `xgboost`, `ortools`, etc.).
+- [packages.txt](file:///c:/Users/ramsa/Desktop/Smart%20Factory%20Production%20Optimization/packages.txt): Linux OpenMP libraries (`libgomp1`) for XGBoost.
+- [.python-version](file:///c:/Users/ramsa/Desktop/Smart%20Factory%20Production%20Optimization/.python-version): Python 3.11 runtime specification.
+- [.streamlit/config.toml](file:///c:/Users/ramsa/Desktop/Smart%20Factory%20Production%20Optimization/.streamlit/config.toml): Dark theme styling and headless server flags.
+
+To deploy:
+1. Push your repository to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io/) &rarr; **New app**.
+3. Select this repo, branch `main`, and main file `app.py`.
+4. Choose Python 3.11 in Advanced Settings, then click **Deploy**.
+
 ---
 
 *AI-Based Smart Factory Production Optimization System &middot; Built for Industry 4.0 Digital Twin Research and Operational Decision Support.*

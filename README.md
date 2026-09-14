@@ -1,7 +1,7 @@
 # AI-Based Smart Factory Production Optimization & Predictive Maintenance System
 
-[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.61-FF4B4B.svg)](https://streamlit.io/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
 [![Google OR-Tools](https://img.shields.io/badge/OR--Tools-9.15-orange.svg)](https://developers.google.com/optimization)
 [![XGBoost](https://img.shields.io/badge/XGBoost-3.4-green.svg)](https://xgboost.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
@@ -223,7 +223,7 @@ Verify all subsystems (Database, Physics Telemetry, PdM Inference, Simulator, OR
 python test_system.py
 ```
 
-### 5. Launch the Dashboard
+### 5. Launch the Dashboard Locally
 Run the Streamlit application:
 
 ```bash
@@ -232,6 +232,19 @@ streamlit run app.py
 
 Access the interface in your browser at:
 `http://localhost:8501`
+
+### ☁️ 6. Deploy to Streamlit Community Cloud
+This repository is pre-configured for one-click deployment on **Streamlit Community Cloud**:
+1. Push this repository to your **GitHub** account.
+2. Visit [share.streamlit.io](https://share.streamlit.io/) and log in with GitHub.
+3. Click **"New app"** and fill in the details:
+   - **Repository:** `your-username/Smart-Factory-Production-Optimization`
+   - **Branch:** `main`
+   - **Main file path:** `app.py`
+4. Under **Advanced settings**, set Python version to `3.11` (or `3.12`).
+5. Click **"Deploy!"**
+   - The platform will automatically install packages from `requirements.txt`, system dependencies from `packages.txt`, and apply the industrial theme from `.streamlit/config.toml`.
+   - SQLite auto-initializes and pre-trained XGBoost / Random Forest models are loaded out-of-the-box.
 
 ---
 

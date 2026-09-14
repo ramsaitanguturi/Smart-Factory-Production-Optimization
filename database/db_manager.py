@@ -7,6 +7,7 @@ import random
 import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from contextlib import contextmanager
 import pandas as pd
 
 from config import DB_PATH, MACHINES, PRODUCTS, PRIORITY_WEIGHTS
@@ -18,10 +19,16 @@ class DatabaseManager:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.init_db()
 
-    def get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), timeout=20.0)
+    @contextmanager
+    def get_connection(self):
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
-        return conn
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        try:
+            yield conn
+        finally:
+            conn.close()
 
     def init_db(self):
         """Initializes tables from schema.sql and seeds initial data if empty."""
