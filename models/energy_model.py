@@ -34,15 +34,23 @@ class EnergyPredictionModel:
         
         total_kwh = effective_power_kw * processing_time_hrs
 
-        # Check peak tariff window (14:00 to 19:00)
-        end_hour = (start_hour_of_day + processing_time_hrs) % 24
-        # Estimate fraction of job running during peak window (14 to 19)
-        peak_fraction = 0.0
-        for h in range(int(processing_time_hrs) + 1):
-            cur_h = (start_hour_of_day + h) % 24
-            if 14 <= cur_h < 19:
-                peak_fraction += 1.0
-        peak_ratio = min(1.0, peak_fraction / max(1.0, processing_time_hrs))
+        # Calculate exact continuous overlap hours with peak window [14.0, 19.0]
+        total_peak_hours = 0.0
+        cur_start = start_hour_of_day
+        rem_duration = processing_time_hrs
+
+        while rem_duration > 0:
+            day_start = cur_start % 24.0
+            chunk_duration = min(rem_duration, 24.0 - day_start)
+            day_end = day_start + chunk_duration
+            # Overlap between [day_start, day_end] and [14.0, 19.0]
+            overlap = max(0.0, min(day_end, 19.0) - max(day_start, 14.0))
+            total_peak_hours += overlap
+            cur_start += chunk_duration
+            rem_duration -= chunk_duration
+
+        peak_ratio = total_peak_hours / max(0.01, processing_time_hrs)
+        peak_ratio = min(1.0, max(0.0, peak_ratio))
         
         effective_tariff = (peak_ratio * ENERGY_PEAK_TARIFF) + ((1.0 - peak_ratio) * ENERGY_OFFPEAK_TARIFF)
         estimated_cost_usd = total_kwh * effective_tariff

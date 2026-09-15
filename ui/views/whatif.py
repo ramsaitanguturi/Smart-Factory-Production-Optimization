@@ -214,8 +214,7 @@ def render_whatif_view(simulator, db):
 
             if st.button("🔄 Reset Entire Factory & Database to Pristine State", use_container_width=True):
                 db.reset_to_defaults()
-                simulator.perform_maintenance("M1-CNC-01")
-                simulator.perform_maintenance("M2-CNC-02")
+                simulator.reset()
                 st.session_state.pop("last_optimization_result", None)
                 st.session_state.pop("guided_opt_result", None)
                 st.success("Factory state reset to defaults.")

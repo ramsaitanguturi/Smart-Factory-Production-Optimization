@@ -192,10 +192,6 @@ class ProductionScheduler:
             assigned_bools = []
             for mid in eligible_mids:
                 m_info = machine_lookup[mid]
-                
-                # If machine is completely failed, prevent assignment if other machines exist
-                if m_info["status"] == STATUS_FAILED and len(eligible_mids) > 1:
-                    continue
 
                 b = model.NewBoolVar(f"x_{oid}_{mid}")
                 s = model.NewIntVar(0, HORIZON_UNITS, f"s_{oid}_{mid}")
@@ -244,8 +240,10 @@ class ProductionScheduler:
             m_fail_prob = m_info["failure_prob"]
             m_health = m_info["health_score"]
 
-            # Risk penalty: steep quadratic penalty if failure probability > 0.25
-            if m_info["status"] == STATUS_CRITICAL or m_fail_prob > 0.50:
+            # Risk penalty: insurmountable penalty if machine is failed, steep quadratic if critical
+            if m_info["status"] == STATUS_FAILED:
+                risk_penalty = 50000  # Insurmountable penalty: only assigned if no alternative machine
+            elif m_info["status"] == STATUS_CRITICAL or m_fail_prob > 0.50:
                 risk_penalty = 8000  # Extreme disincentive
             elif m_info["status"] == STATUS_WARNING or m_fail_prob > 0.25 or m_health < 70.0:
                 risk_penalty = int(m_fail_prob * 3000)

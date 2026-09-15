@@ -10,6 +10,8 @@ Tests:
 import sys
 import os
 import unittest
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 from pathlib import Path
 
 # Add project root to sys.path
@@ -30,11 +32,13 @@ class TestSmartFactorySystem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.db = DatabaseManager()
+        cls.db.reset_to_defaults()
         cls.generator = TelemetryGenerator(random_seed=123)
         cls.pdm = PredictiveMaintenanceModel()
         cls.energy = EnergyPredictionModel()
         cls.delay = DelayPredictionModel()
         cls.simulator = FactorySimulator(db=cls.db)
+        cls.simulator.reset()
         cls.scheduler = ProductionScheduler(db=cls.db)
 
     def test_01_database_seeded(self):
@@ -111,6 +115,179 @@ class TestSmartFactorySystem(unittest.TestCase):
         self.assertIn("improvements", res)
         print(f" [PASS] OR-Tools Solver: status={res['solver_status']} in {res['solve_time_ms']}ms")
         print(f"        Improvements: Delay Saved={res['improvements']['delay_saved_hrs']}h, High Risk Avoided={res['improvements']['high_risk_jobs_avoided']}")
+
+    def test_06_order_progression(self):
+        """BUG-01: Verify step() decrements order processing time and completes finished jobs."""
+        # Ensure fresh state for test order
+        test_oid = "ORD-TEST-PROG"
+        with self.db.get_connection() as conn:
+            conn.execute("DELETE FROM production_orders WHERE order_id = ?", (test_oid,))
+            conn.commit()
+
+        self.db.add_order(
+            order_id=test_oid,
+            product_code="PRD-AERO-01",
+            product_name="Test Turbine Blade",
+            quantity=10,
+            processing_time_hrs=1.0,
+            required_machine_type="CNC_MILL",
+            priority="High",
+            deadline_hrs=12.0
+        )
+        self.db.update_order_assignment(
+            order_id=test_oid,
+            machine_id="M1-CNC-01",
+            start_hrs=0.0,
+            end_hrs=1.0,
+            delay_risk=0.05,
+            is_delayed=0,
+            energy_kwh=25.0
+        )
+        # Advance by 0.5 hours
+        self.simulator.step(time_delta_hrs=0.5)
+        orders = {o["order_id"]: o for o in self.db.get_orders()}
+        self.assertEqual(orders[test_oid]["status"], "In-Progress")
+        self.assertAlmostEqual(orders[test_oid]["processing_time_hrs"], 0.5, places=2)
+
+        # Advance by 0.6 hours -> should complete
+        self.simulator.step(time_delta_hrs=0.6)
+        orders = {o["order_id"]: o for o in self.db.get_orders()}
+        self.assertEqual(orders[test_oid]["status"], "Completed")
+        self.assertAlmostEqual(orders[test_oid]["processing_time_hrs"], 0.0, places=2)
+        print(f" [PASS] BUG-01: Order progression advanced and transitioned to Completed correctly.")
+
+    def test_07_energy_continuous_peak_overlap(self):
+        """BUG-02: Verify continuous interval overlap calculus in peak tariff calculation."""
+        # Case 1: Job starts at 13.5 and runs for 1.0 hr (ends at 14.5).
+        # Overlap with [14.0, 19.0] must be exactly 0.5h, so peak_ratio = 0.5 / 1.0 = 0.50
+        res1 = self.energy.predict_job_energy("M1-CNC-01", processing_time_hrs=1.0, start_hour_of_day=13.5)
+        self.assertAlmostEqual(res1["peak_ratio"], 0.50, places=2)
+
+        # Case 2: Job starts at 10.0 and runs for 2.0 hr (ends at 12.0) -> zero overlap
+        res2 = self.energy.predict_job_energy("M1-CNC-01", processing_time_hrs=2.0, start_hour_of_day=10.0)
+        self.assertAlmostEqual(res2["peak_ratio"], 0.0, places=2)
+
+        # Case 3: Job entirely within peak window: 14.0 to 19.0 (5.0 hrs) -> 100% peak
+        res3 = self.energy.predict_job_energy("M1-CNC-01", processing_time_hrs=5.0, start_hour_of_day=14.0)
+        self.assertAlmostEqual(res3["peak_ratio"], 1.0, places=2)
+        print(f" [PASS] BUG-02: Continuous interval overlap verified (0.5h overlap -> peak_ratio={res1['peak_ratio']}).")
+
+    def test_08_sqlite_foreign_keys_and_batch_telemetry(self):
+        """BUG-03: Verify foreign key enforcement and batch telemetry recording."""
+        import sqlite3
+        # Foreign key violation test
+        with self.assertRaises(sqlite3.IntegrityError):
+            with self.db.get_connection() as conn:
+                conn.execute("""
+                    INSERT INTO telemetry (
+                        machine_id, temperature, vibration, rpm, pressure,
+                        power_kw, health_score, failure_prob, status
+                    ) VALUES ('NON-EXISTENT-MACHINE', 65.0, 1.2, 10000, 100.0, 20.0, 95.0, 0.02, 'NORMAL')
+                """)
+
+        # Batch telemetry insertion test
+        batch_rows = [
+            ("M1-CNC-01", 60.0, 1.0, 12000, 100.0, 15.0, 98.0, 0.01, "NORMAL"),
+            ("M2-CNC-02", 62.0, 1.1, 11800, 98.0, 16.0, 97.0, 0.01, "NORMAL"),
+        ]
+        self.db.record_telemetry_batch(batch_rows)
+        df = self.db.get_recent_telemetry(limit=2)
+        self.assertGreaterEqual(len(df), 2)
+        print(" [PASS] BUG-03: Foreign key PRAGMA enforced and batch telemetry written in single transaction.")
+
+    def test_09_all_failed_machine_resilience(self):
+        """BUG-04: Verify scheduler handles all-failed machines without deadlock or dropping orders."""
+        try:
+            # Fail both CNC machines
+            with self.db.get_connection() as conn:
+                conn.execute("UPDATE machines SET status = 'FAILED' WHERE type = 'CNC_MILL'")
+                conn.commit()
+
+            # Optimizer should still assign all orders (including CNC orders with heavy penalty) without dropping any
+            res = self.scheduler.optimize_schedule(max_solve_time_sec=4.0, commit_to_db=False)
+            self.assertIn(res["solver_status"], ["OPTIMAL", "FEASIBLE"])
+            # Verify order count matches
+            orders = self.db.get_orders()
+            self.assertEqual(len(res["optimized"]["scheduled_orders"]), len(orders), "No orders should be dropped")
+            print(f" [PASS] BUG-04: Optimizer handled all-failed cell with 0 orders dropped ({len(res['optimized']['scheduled_orders'])} orders scheduled).")
+        finally:
+            # Restore machines
+            with self.db.get_connection() as conn:
+                conn.execute("UPDATE machines SET status = 'NORMAL' WHERE type = 'CNC_MILL'")
+                conn.commit()
+
+    def test_10_simulator_reset(self):
+        """BUG-05: Verify simulator.reset() resets clock, anomalies, and latest telemetry."""
+        self.simulator.simulation_time_hrs = 15.5
+        self.simulator.inject_anomaly("M3-ROB-01", "BEARING_WEAR")
+        self.assertTrue(self.simulator.anomaly_states["M3-ROB-01"]["active"])
+
+        # Execute reset
+        self.simulator.reset()
+        self.assertEqual(self.simulator.simulation_time_hrs, 0.0)
+        self.assertFalse(self.simulator.anomaly_states["M3-ROB-01"]["active"])
+        self.assertIn("M3-ROB-01", self.simulator.latest_telemetry)
+        print(" [PASS] BUG-05: Simulator reset() properly restored clock to 0.0 and cleared anomalies.")
+
+    def test_11_delay_model_semantics(self):
+        """BUG-06: Verify separation between actual lateness and unreliability risk."""
+        # Job with ample 15-hour buffer slack on a degraded machine
+        res = self.delay.predict_delay_risk(
+            processing_time_hrs=3.0,
+            deadline_hrs=25.0,
+            scheduled_start_hrs=7.0,  # ends at 10.0, slack = 15.0h
+            machine_failure_prob=0.85,
+            machine_health_score=25.0,
+            priority="High"
+        )
+        self.assertEqual(res["is_delayed"], 0, "Order with 15h positive slack must NOT be flagged as delayed/late")
+        self.assertEqual(res["is_at_risk"], 1, "Degraded machine should correctly flag order as at risk")
+        print(f" [PASS] BUG-06: Lateness and delay risk disentangled: is_delayed={res['is_delayed']}, is_at_risk={res['is_at_risk']}.")
+
+    def test_12_unique_order_insertion(self):
+        """BUG-08: Verify get_next_order_id generates unique IDs and add_order handles collisions."""
+        next_id = self.db.get_next_order_id()
+        self.assertTrue(next_id.startswith("ORD-"))
+        try:
+            success1 = self.db.add_order(
+                order_id=next_id,
+                product_code="PRD-AERO-01",
+                product_name="Aero Turbine",
+                quantity=10,
+                processing_time_hrs=2.0,
+                required_machine_type="CNC_MILL",
+                priority="Medium",
+                deadline_hrs=18.0
+            )
+            self.assertTrue(success1)
+
+            # Attempt duplicate insertion
+            success2 = self.db.add_order(
+                order_id=next_id,
+                product_code="PRD-AERO-01",
+                product_name="Aero Turbine Duplicate",
+                quantity=10,
+                processing_time_hrs=2.0,
+                required_machine_type="CNC_MILL",
+                priority="Medium",
+                deadline_hrs=18.0
+            )
+            self.assertFalse(success2, "Duplicate order ID must return False")
+            print(f" [PASS] BUG-08: Sequential ID {next_id} generated and collision rejected properly.")
+        finally:
+            with self.db.get_connection() as conn:
+                conn.execute("DELETE FROM production_orders WHERE order_id = ?", (next_id,))
+                conn.commit()
+
+    def test_13_no_joblib_deprecation_warning(self):
+        """BUG-10: Verify loading PdM models produces zero deprecation warnings."""
+        with warnings.catch_warnings(record=True) as recorded_warnings:
+            warnings.simplefilter("always")
+            new_pdm = PredictiveMaintenanceModel()
+            self.assertTrue(new_pdm.load_models())
+            dep_warnings = [w for w in recorded_warnings if issubclass(w.category, DeprecationWarning)]
+            self.assertEqual(len(dep_warnings), 0, "No deprecation warnings should be emitted on model loading")
+            print(" [PASS] BUG-10: PdM model loads cleanly with 0 deprecation warnings.")
 
 
 if __name__ == "__main__":

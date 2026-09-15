@@ -25,6 +25,7 @@ class DatabaseManager:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=30000;")
+        conn.execute("PRAGMA foreign_keys = ON;")
         try:
             yield conn
         finally:
@@ -149,6 +150,18 @@ class DatabaseManager:
             """, (machine_id, temp, vib, rpm, pressure, power, health, fail_prob, status))
             conn.commit()
 
+    def record_telemetry_batch(self, telemetry_rows: List[tuple]):
+        """Batch writes multiple telemetry readings in a single ACID transaction."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany("""
+                INSERT INTO telemetry (
+                    machine_id, temperature, vibration, rpm, pressure,
+                    power_kw, health_score, failure_prob, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, telemetry_rows)
+            conn.commit()
+
     def get_recent_telemetry(self, machine_id: Optional[str] = None, limit: int = 50) -> pd.DataFrame:
         with self.get_connection() as conn:
             if machine_id:
@@ -195,6 +208,25 @@ class DatabaseManager:
                 return True
             except sqlite3.IntegrityError:
                 return False
+
+    def get_next_order_id(self) -> str:
+        """Generates a collision-free sequential order ID based on maximum existing order number."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT order_id FROM production_orders")
+            rows = cursor.fetchall()
+            max_num = 100
+            for r in rows:
+                oid = r[0]
+                try:
+                    parts = oid.split("-")
+                    if len(parts) >= 2 and parts[-1].isdigit():
+                        num = int(parts[-1])
+                        if num > max_num:
+                            max_num = num
+                except Exception:
+                    pass
+            return f"ORD-{max_num + 1}"
 
     def update_order_assignment(self, order_id: str, machine_id: str, start_hrs: float,
                                 end_hrs: float, delay_risk: float, is_delayed: int,

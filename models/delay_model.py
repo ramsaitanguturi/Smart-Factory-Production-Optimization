@@ -53,7 +53,8 @@ class DelayPredictionModel:
             compound_risk = max(compound_risk, 0.48)
 
         final_prob = float(np.clip(compound_risk, 0.02, 0.99))
-        is_delayed = int(final_prob > 0.50 or slack_buffer < 0.0)
+        is_late = int(slack_buffer < 0.0)
+        is_at_risk = int(final_prob > 0.50)
         expected_tardiness = round(max(0.0, -slack_buffer + (machine_failure_prob * 6.0)), 1)
 
         # Risk category
@@ -66,7 +67,8 @@ class DelayPredictionModel:
 
         return {
             "delay_probability": round(final_prob, 3),
-            "is_delayed": is_delayed,
+            "is_delayed": is_late,
+            "is_at_risk": is_at_risk,
             "slack_buffer_hrs": round(slack_buffer, 1),
             "expected_tardiness_hrs": expected_tardiness,
             "risk_category": risk_category,

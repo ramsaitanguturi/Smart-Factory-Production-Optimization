@@ -7,10 +7,14 @@ Uses XGBoost Classifier & Random Forest Regressor to predict:
 4. Primary Risk Factor / Degradation Cause
 """
 import joblib
+import warnings
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 import numpy as np
 import pandas as pd
+
+# Suppress NumPy 2.x array shape mutation deprecation warning from joblib unpickling
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from config import MODELS_DIR
 
@@ -36,10 +40,12 @@ class PredictiveMaintenanceModel:
         """Loads serialized models from disk if available."""
         if self.clf_path.exists() and self.rul_path.exists():
             try:
-                self.classifier = joblib.load(self.clf_path)
-                self.rul_regressor = joblib.load(self.rul_path)
-                if self.metrics_path.exists():
-                    self.evaluation_metrics = joblib.load(self.metrics_path)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self.classifier = joblib.load(self.clf_path)
+                    self.rul_regressor = joblib.load(self.rul_path)
+                    if self.metrics_path.exists():
+                        self.evaluation_metrics = joblib.load(self.metrics_path)
                 return True
             except Exception as e:
                 print(f"Error loading PdM models: {e}")

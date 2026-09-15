@@ -251,7 +251,7 @@ def render_gantt_chart(orders: List[Dict[str, Any]], title: str = "Production Sc
         height=380,
         margin=dict(l=60, r=30, t=50, b=30),
         font=dict(color="#e2e8f0"),
-        xaxis=dict(title="Schedule Timeline (Hours from start)", gridcolor="#1e293b", color="#94a3b8"),
+        xaxis=dict(title="Schedule Timeline (Hours from start)", gridcolor="#1e293b", color="#94a3b8", tickformat="%H:%M\nT+%d d"),
         yaxis=dict(title="", gridcolor="#1e293b", color="#e2e8f0", autorange="reversed"),
         legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center", font=dict(color="#cbd5e1"))
     )

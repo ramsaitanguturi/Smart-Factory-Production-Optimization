@@ -38,6 +38,13 @@ def render_production_view(simulator, db):
             delay_risk = o.get("delay_risk_prob", 0.0)
             is_del = o.get("is_delayed", 0)
             
+            if is_del:
+                status_badge = "⚠️ LATE"
+            elif delay_risk > 0.50:
+                status_badge = "⚠️ AT RISK"
+            else:
+                status_badge = "✅ ON TIME"
+            
             table_rows.append({
                 "Order ID": o["order_id"],
                 "Product": o["product_name"],
@@ -49,7 +56,7 @@ def render_production_view(simulator, db):
                 "Assigned Machine": o.get("assigned_machine_id") or "Unassigned",
                 "Status": o["status"],
                 "Delay Risk (%)": f"{delay_risk*100:.1f}%",
-                "Delayed?": "⚠️ LATE" if is_del else "✅ ON TIME",
+                "Schedule Risk": status_badge,
                 "Energy (kWh)": o.get("energy_kwh_predicted", 0.0)
             })
         
@@ -77,11 +84,11 @@ def render_production_view(simulator, db):
             prio = st.selectbox("Order Priority", ["Low", "Medium", "High", "Urgent"], index=2)
         with c3:
             deadline = st.number_input("Delivery Deadline (hrs from now)", min_value=1.0, max_value=72.0, value=12.0, step=1.0)
-            new_oid = f"ORD-{len(orders) + 101}"
+            new_oid = db.get_next_order_id()
             submit_btn = st.form_submit_button("🚀 Submit Order to Shop Floor Backlog", use_container_width=True)
 
         if submit_btn:
-            db.add_order(
+            success = db.add_order(
                 order_id=new_oid,
                 product_code=p_obj["code"],
                 product_name=p_obj["name"],
@@ -91,5 +98,8 @@ def render_production_view(simulator, db):
                 priority=prio,
                 deadline_hrs=deadline
             )
-            st.success(f"Production Order {new_oid} successfully queued for scheduling!")
-            st.rerun()
+            if success:
+                st.success(f"Production Order {new_oid} successfully queued for scheduling!")
+                st.rerun()
+            else:
+                st.error(f"Failed to queue order {new_oid}: ID conflict or database error.")

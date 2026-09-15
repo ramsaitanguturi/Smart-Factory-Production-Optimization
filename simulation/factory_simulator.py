@@ -34,6 +34,13 @@ class FactorySimulator:
         # Initialize machine memory buffers
         self._initialize_runtime_state()
 
+    def reset(self):
+        """Completely resets simulator clock, clears all anomalies, and re-seeds baseline."""
+        self.simulation_time_hrs = 0.0
+        self.anomaly_states.clear()
+        self.latest_telemetry.clear()
+        self._initialize_runtime_state()
+
     def _initialize_runtime_state(self):
         """Initializes internal tracking for machines and fills initial telemetry if empty."""
         db_machines = self.db.get_machines()
@@ -81,6 +88,7 @@ class FactorySimulator:
         self.simulation_time_hrs += time_delta_hrs
         machines = self.db.get_machines()
         updates = []
+        telemetry_batch = []
 
         for m in machines:
             mid = m["machine_id"]
@@ -171,18 +179,42 @@ class FactorySimulator:
                 failure_prob=fail_prob,
                 operating_hours=round(current_hours, 1)
             )
-            self.db.record_telemetry(
-                machine_id=mid,
-                temp=reading["temperature"],
-                vib=reading["vibration"],
-                rpm=reading["rpm"],
-                pressure=reading["pressure"],
-                power=reading["power_kw"],
-                health=health,
-                fail_prob=fail_prob,
-                status=new_status
-            )
+            telemetry_batch.append((
+                mid, reading["temperature"], reading["vibration"],
+                reading["rpm"], reading["pressure"], reading["power_kw"],
+                health, fail_prob, new_status
+            ))
             updates.append({"machine_id": mid, "telemetry": reading})
+
+        # Batch write telemetry in a single ACID transaction (BUG-03)
+        if telemetry_batch:
+            self.db.record_telemetry_batch(telemetry_batch)
+
+        # Advance in-flight production orders (BUG-01)
+        active_orders = self.db.get_orders(status="Scheduled") + self.db.get_orders(status="In-Progress")
+        for order in active_orders:
+            assigned_mid = order.get("assigned_machine_id")
+            if not assigned_mid:
+                continue
+            m_info = self.db.get_machine(assigned_mid)
+            # Only advance execution if assigned machine is operational
+            if m_info and m_info["status"] in (STATUS_NORMAL, STATUS_WARNING):
+                rem_time = max(0.0, float(order["processing_time_hrs"]) - time_delta_hrs)
+                if rem_time <= 0.001:
+                    self.db.update_order_status(order["order_id"], "Completed")
+                    with self.db.get_connection() as conn:
+                        conn.execute("UPDATE production_orders SET processing_time_hrs = 0.0 WHERE order_id = ?",
+                                     (order["order_id"],))
+                        conn.execute("UPDATE machines SET total_cycles = total_cycles + 1 WHERE machine_id = ?",
+                                     (assigned_mid,))
+                        conn.commit()
+                else:
+                    with self.db.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE production_orders SET processing_time_hrs = ?, status = 'In-Progress' WHERE order_id = ?",
+                            (round(rem_time, 2), order["order_id"])
+                        )
+                        conn.commit()
 
         return {
             "simulation_time_hrs": round(self.simulation_time_hrs, 2),
