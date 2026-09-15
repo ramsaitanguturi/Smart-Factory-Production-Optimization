@@ -73,30 +73,31 @@ class DatabaseManager:
             ))
 
     def _seed_initial_orders(self, conn: sqlite3.Connection):
-        """Seeds realistic initial production orders across machine types."""
+        """Seeds realistic initial production orders across machine types with baseline assignments."""
         cursor = conn.cursor()
         order_seeds = [
-            ("ORD-101", "PRD-AERO-01", 15, 4.5, "CNC_MILL", "High", 12.0),
-            ("ORD-102", "PRD-AERO-04", 8, 5.0, "CNC_MILL", "Urgent", 8.0),
-            ("ORD-103", "PRD-AERO-01", 20, 6.0, "CNC_MILL", "Medium", 24.0),
-            ("ORD-104", "PRD-AERO-04", 12, 5.5, "CNC_MILL", "Low", 36.0),
-            ("ORD-201", "PRD-AUTO-02", 40, 3.5, "ROBOTIC_ARM", "Urgent", 10.0),
-            ("ORD-202", "PRD-AUTO-05", 25, 4.0, "ROBOTIC_ARM", "High", 16.0),
-            ("ORD-203", "PRD-AUTO-02", 50, 4.5, "ROBOTIC_ARM", "Medium", 28.0),
-            ("ORD-204", "PRD-AUTO-05", 30, 3.0, "ROBOTIC_ARM", "Low", 32.0),
-            ("ORD-301", "PRD-POLY-03", 100, 3.0, "INJECTION_MOLD", "Urgent", 11.0),
-            ("ORD-302", "PRD-MED-06", 80, 2.5, "INJECTION_MOLD", "High", 14.0),
-            ("ORD-303", "PRD-POLY-03", 150, 4.0, "INJECTION_MOLD", "Medium", 26.0),
-            ("ORD-304", "PRD-MED-06", 60, 2.0, "INJECTION_MOLD", "Low", 30.0),
+            ("ORD-101", "PRD-AERO-01", 15, 4.5, "CNC_MILL", "High", 12.0, "M1-CNC-01", 0.0, 4.5),
+            ("ORD-102", "PRD-AERO-04", 8, 5.0, "CNC_MILL", "Urgent", 8.0, "M2-CNC-02", 0.0, 5.0),
+            ("ORD-103", "PRD-AERO-01", 20, 6.0, "CNC_MILL", "Medium", 24.0, "M1-CNC-01", 4.5, 10.5),
+            ("ORD-104", "PRD-AERO-04", 12, 5.5, "CNC_MILL", "Low", 36.0, "M2-CNC-02", 5.0, 10.5),
+            ("ORD-201", "PRD-AUTO-02", 40, 3.5, "ROBOTIC_ARM", "Urgent", 10.0, "M3-ROB-01", 0.0, 3.5),
+            ("ORD-202", "PRD-AUTO-05", 25, 4.0, "ROBOTIC_ARM", "High", 16.0, "M4-ROB-02", 0.0, 4.0),
+            ("ORD-203", "PRD-AUTO-02", 50, 4.5, "ROBOTIC_ARM", "Medium", 28.0, "M3-ROB-01", 3.5, 8.0),
+            ("ORD-204", "PRD-AUTO-05", 30, 3.0, "ROBOTIC_ARM", "Low", 32.0, "M4-ROB-02", 4.0, 7.0),
+            ("ORD-301", "PRD-POLY-03", 100, 3.0, "INJECTION_MOLD", "Urgent", 11.0, "M5-INJ-01", 0.0, 3.0),
+            ("ORD-302", "PRD-MED-06", 80, 2.5, "INJECTION_MOLD", "High", 14.0, "M6-INJ-02", 0.0, 2.5),
+            ("ORD-303", "PRD-POLY-03", 150, 4.0, "INJECTION_MOLD", "Medium", 26.0, "M5-INJ-01", 3.0, 7.0),
+            ("ORD-304", "PRD-MED-06", 60, 2.0, "INJECTION_MOLD", "Low", 30.0, "M6-INJ-02", 2.5, 4.5),
         ]
         prod_map = {p["code"]: p["name"] for p in PRODUCTS}
-        for oid, pcode, qty, ptime, mtype, prio, dline in order_seeds:
+        for oid, pcode, qty, ptime, mtype, prio, dline, assigned_mid, start_hrs, end_hrs in order_seeds:
             cursor.execute("""
                 INSERT INTO production_orders (
                     order_id, product_code, product_name, quantity, processing_time_hrs,
                     required_machine_type, priority, deadline_hrs, status,
+                    assigned_machine_id, scheduled_start_hrs, scheduled_end_hrs,
                     delay_risk_prob, is_delayed, energy_kwh_predicted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0.05, 0, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, 0.05, 0, ?)
             """, (
                 oid,
                 pcode,
@@ -106,6 +107,9 @@ class DatabaseManager:
                 mtype,
                 prio,
                 dline,
+                assigned_mid,
+                start_hrs,
+                end_hrs,
                 round(ptime * 25.0, 1)
             ))
 

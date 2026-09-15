@@ -38,23 +38,27 @@ def render_production_view(simulator, db):
             delay_risk = o.get("delay_risk_prob", 0.0)
             is_del = o.get("is_delayed", 0)
             
-            if is_del:
-                status_badge = "⚠️ LATE"
-            elif delay_risk > 0.50:
-                status_badge = "⚠️ AT RISK"
+            status_val = o.get("status", "Pending")
+            if status_val == "Completed":
+                display_status = "✅ Completed"
+            elif status_val == "In-Progress":
+                display_status = "⚙️ In-Progress"
+            elif status_val == "Scheduled":
+                display_status = "📅 Scheduled"
             else:
-                status_badge = "✅ ON TIME"
-            
+                display_status = "⏳ Pending"
+
             table_rows.append({
                 "Order ID": o["order_id"],
                 "Product": o["product_name"],
                 "Quantity": o["quantity"],
                 "Machine Type": o["required_machine_type"],
                 "Priority": o["priority"],
-                "Duration (hrs)": o["processing_time_hrs"],
-                "Deadline (hrs)": o["deadline_hrs"],
+                "Remaining Time (hrs)": f"{float(o['processing_time_hrs']):.1f} h",
+                "Start Time": f"T + {float(o.get('scheduled_start_hrs', 0.0)):.1f} h",
+                "Deadline": f"T + {float(o['deadline_hrs']):.1f} h",
                 "Assigned Machine": o.get("assigned_machine_id") or "Unassigned",
-                "Status": o["status"],
+                "Status": display_status,
                 "Delay Risk (%)": f"{delay_risk*100:.1f}%",
                 "Schedule Risk": status_badge,
                 "Energy (kWh)": o.get("energy_kwh_predicted", 0.0)

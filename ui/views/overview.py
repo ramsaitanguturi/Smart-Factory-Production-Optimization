@@ -80,6 +80,18 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
             health_clr = pal["accent_green"] if health >= 80 else pal["accent_amber"] if health >= 55 else pal["accent_red"]
             fail_clr = pal["accent_red"] if fail_prob > 0.4 else pal["accent_amber"] if fail_prob > 0.15 else pal["accent_green"]
 
+            # Status descriptive subtitle
+            if status == STATUS_MAINTENANCE:
+                rem = getattr(simulator, "maintenance_remaining", {}).get(mid, 2.0)
+                status_sub = f"🔧 Technician Overhaul: {rem:.1f}h remaining"
+            elif status == STATUS_CRITICAL:
+                crit_h = getattr(simulator, "critical_runtime_hrs", {}).get(mid, 0.0)
+                status_sub = f"⚠️ CRITICAL: {crit_h:.1f}h unmaintained (Imminent Failure)"
+            elif status == STATUS_FAILED:
+                status_sub = "🛑 HALTED: Spindle Seized - Requires Overhaul"
+            else:
+                status_sub = telem.get('primary_cause', 'Normal Operation')
+
             card_html = f"""<div class="machine-card {status_class}">
 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
 <div>
@@ -111,15 +123,15 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
 </div>
 <div>
 <span style="color: {pal['text_muted']};">Temp:</span>
-<span style="font-family: monospace; color: {pal['accent_red'] if telem.get('temperature', 60) > 85 else pal['text_secondary']};"> {telem.get('temperature', 62.0):.1f}°C</span>
+<span style="font-family: monospace; color: {pal['accent_red'] if telem.get('temperature', 60.0) > 85 else pal['text_secondary']};"> {telem.get('temperature', 60.0):.1f}°C</span>
 </div>
 <div>
 <span style="color: {pal['text_muted']};">Vib:</span>
-<span style="font-family: monospace; color: {pal['accent_red'] if telem.get('vibration', 1.2) > 3.5 else pal['text_secondary']};"> {telem.get('vibration', 1.3):.2f} mm/s</span>
+<span style="font-family: monospace; color: {pal['accent_red'] if telem.get('vibration', 1.2) > 3.5 else pal['text_secondary']};"> {telem.get('vibration', 1.2):.2f} mm/s</span>
 </div>
 <div>
 <span style="color: {pal['text_muted']};">Power:</span>
-<span style="font-family: monospace; color: {pal['text_secondary']};"> {telem.get('power_kw', 18.0):.1f} kW</span>
+<span style="font-family: monospace; color: {pal['text_secondary']};"> {telem.get('power_kw', m.get('idle_power_kw', 3.0)):.1f} kW</span>
 </div>
 <div>
 <span style="color: {pal['text_muted']};">Orders:</span>
@@ -127,7 +139,7 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
 </div>
 </div>
 <div style="margin-top: 8px; font-size: 0.72rem; color: {pal['text_muted']}; font-style: italic;">
-{telem.get('primary_cause', 'Normal Operation')}
+{status_sub}
 </div>
 </div>"""
             with cols[col_idx]:
@@ -229,9 +241,9 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
                 pass
             st.rerun()
     with anom_c5:
-        if st.button("🔧 Maintenance", use_container_width=True, help=f"Place {selected_mid} offline for overhaul (MAINTENANCE Blue)"):
+        if st.button("🔧 Maintenance", use_container_width=True, help=f"Place {selected_mid} offline for 2.0h overhaul (MAINTENANCE Blue)"):
             simulator.set_maintenance(selected_mid, in_maintenance=True)
-            msg = f"🔧 {selected_mid} is now offline for technician overhaul -> MAINTENANCE state."
+            msg = f"🔧 {selected_mid} is now offline for 2.0h overhaul. Step simulation clock (+0.5h or +2.0h) to progress, or click Restore to finish immediately."
             st.session_state["overview_feedback"] = ("success", msg)
             try:
                 st.toast(msg, icon="🔧")

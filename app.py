@@ -137,6 +137,15 @@ def main():
 
     # Fetch live state for top headers & KPIs
     machines = db.get_machines()
+    for m in machines:
+        mid = m["machine_id"]
+        telem = simulator.latest_telemetry.get(mid, {})
+        m["power_kw"] = telem.get("power_kw", m.get("idle_power_kw", 3.0))
+        m["temperature"] = telem.get("temperature", 62.0)
+        m["vibration"] = telem.get("vibration", 1.2)
+        m["rpm"] = telem.get("rpm", m.get("max_rpm", 8000))
+        m["pressure"] = telem.get("pressure", 100.0)
+
     orders = db.get_orders()
     active_alerts = sum(1 for m in machines if m["status"] in ("WARNING", "CRITICAL", "FAILED"))
 

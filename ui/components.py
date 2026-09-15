@@ -102,12 +102,14 @@ def render_kpi_row(machines: List[Dict[str, Any]], orders: List[Dict[str, Any]],
         </div>
         """, unsafe_allow_html=True)
     with c5:
-        cur_power = sum(m.get("power_kw", m.get("nominal_power_kw", 25.0) * 0.75) for m in machines)
+        cur_power = sum(m.get("power_kw", m.get("idle_power_kw", 3.0)) for m in machines)
+        peak_cap = sum(m.get("nominal_power_kw", 25.0) for m in machines)
+        load_pct = (cur_power / peak_cap * 100.0) if peak_cap > 0 else 0.0
         st.markdown(f"""
         <div class="kpi-card">
             <div class="kpi-label">Current Factory Load</div>
             <div class="kpi-value" style="color: {pal['accent_amber']};">{cur_power:.1f} kW</div>
-            <div class="kpi-sub">Peak Cap: 157.0 kW</div>
+            <div class="kpi-sub">{load_pct:.0f}% of {peak_cap:.1f} kW Peak</div>
         </div>
         """, unsafe_allow_html=True)
     with c6:

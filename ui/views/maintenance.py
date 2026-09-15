@@ -72,11 +72,21 @@ def render_maintenance_view(simulator, db, theme: Optional[str] = None):
             rul_hours = telem.get("rul_hours", 650.0)
             status = m_data["status"]
             
+            badge_class = "badge-normal"
+            if status == STATUS_WARNING:
+                badge_class = "badge-warning"
+            elif status == STATUS_CRITICAL:
+                badge_class = "badge-critical"
+            elif status == STATUS_FAILED:
+                badge_class = "badge-failed"
+            elif status == STATUS_MAINTENANCE:
+                badge_class = "badge-maintenance"
+
             m_status_html = f"""<div style="background: {pal['status_box_bg']}; border: 1px solid {pal['status_box_border']}; border-radius: 10px; padding: 16px; height: 180px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
 <div>
 <div style="display: flex; justify-content: space-between; align-items: center;">
 <span style="font-size: 0.8rem; color: {pal['text_muted']}; font-family: monospace;">STATUS & RUL PROGNOSIS</span>
-<span class="badge-status {'badge-normal' if status == STATUS_NORMAL else 'badge-warning' if status == STATUS_WARNING else 'badge-critical'}">
+<span class="badge-status {badge_class}">
 {status}
 </span>
 </div>
@@ -92,32 +102,41 @@ def render_maintenance_view(simulator, db, theme: Optional[str] = None):
 </div>"""
             st.markdown(m_status_html, unsafe_allow_html=True)
 
+        if status == STATUS_MAINTENANCE:
+            rem = getattr(simulator, "maintenance_remaining", {}).get(selected_mid, 2.0)
+            st.info(f"🔧 **Maintenance In Progress**: {rem:.1f} hours remaining until overhaul completes. Step the simulation clock (+0.5h or +2.0h) in the sidebar to advance service time, or click 'Overhaul / Service' below to restore immediately.")
+        elif status == STATUS_CRITICAL:
+            crit_h = getattr(simulator, "critical_runtime_hrs", {}).get(selected_mid, 0.0)
+            st.error(f"🚨 **Critical Operational Warning**: {selected_mid} has been running unserviced under critical stress for {crit_h:.1f} hours! Continued unserviced operation will cause imminent catastrophic breakdown (spindle seizure).")
+        elif status == STATUS_FAILED:
+            st.error(f"🛑 **Catastrophic Breakdown**: {selected_mid} spindle is seized and workstation is halted! Click 'Overhaul / Service' below to dispatch emergency repair.")
+
         # Telemetry Gauges (5 core sensors)
         st.markdown("##### 📊 Physical Telemetry Sensors")
         g1, g2, g3, g4, g5 = st.columns(5)
         with g1:
             st.plotly_chart(
-                render_gauge_chart(telem.get("temperature", 65.0), "Temperature", 30, 130, 85, 105, "°C", theme=current_theme),
+                render_gauge_chart(telem.get("temperature", 60.0), "Temperature", 30, 130, 85, 105, "°C", theme=current_theme),
                 use_container_width=True
             )
         with g2:
             st.plotly_chart(
-                render_gauge_chart(telem.get("vibration", 1.4), "Vibration", 0.0, 8.0, 3.5, 5.5, "mm/s RMS", theme=current_theme),
+                render_gauge_chart(telem.get("vibration", 1.2), "Vibration", 0.0, 8.0, 3.5, 5.5, "mm/s RMS", theme=current_theme),
                 use_container_width=True
             )
         with g3:
             st.plotly_chart(
-                render_gauge_chart(telem.get("rpm", 8000), "Motor Spindle", 0, m_data["max_rpm"], m_data["max_rpm"] * 0.75, m_data["max_rpm"] * 0.45, "RPM", reverse_hazard=True, theme=current_theme),
+                render_gauge_chart(telem.get("rpm", m_data["max_rpm"]), "Motor Spindle", 0, m_data["max_rpm"], m_data["max_rpm"] * 0.75, m_data["max_rpm"] * 0.45, "RPM", reverse_hazard=True, theme=current_theme),
                 use_container_width=True
             )
         with g4:
             st.plotly_chart(
-                render_gauge_chart(telem.get("pressure", 105.0), "Hydraulic Pressure", 0, 150, 75, 55, "bar", reverse_hazard=True, theme=current_theme),
+                render_gauge_chart(telem.get("pressure", 100.0), "Hydraulic Pressure", 0, 150, 75, 55, "bar", reverse_hazard=True, theme=current_theme),
                 use_container_width=True
             )
         with g5:
             st.plotly_chart(
-                render_gauge_chart(telem.get("power_kw", 18.0), "Power Draw", 0, m_data["nominal_power_kw"] * 1.5, m_data["nominal_power_kw"] * 1.15, m_data["nominal_power_kw"] * 1.35, "kW", theme=current_theme),
+                render_gauge_chart(telem.get("power_kw", m_data.get("idle_power_kw", 3.0)), "Power Draw", 0, m_data["nominal_power_kw"] * 1.5, m_data["nominal_power_kw"] * 1.15, m_data["nominal_power_kw"] * 1.35, "kW", theme=current_theme),
                 use_container_width=True
             )
 
