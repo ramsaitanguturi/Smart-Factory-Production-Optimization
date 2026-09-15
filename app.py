@@ -24,6 +24,9 @@ from ui.styles import apply_custom_styles, get_theme_palette
 from ui.components import render_header, render_kpi_row
 from database.db_manager import DatabaseManager
 from simulation.factory_simulator import FactorySimulator
+import importlib
+import ui.views.overview
+importlib.reload(ui.views.overview)
 from ui.views.overview import render_overview_view
 from ui.views.maintenance import render_maintenance_view
 from ui.views.production import render_production_view

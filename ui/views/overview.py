@@ -124,24 +124,55 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
     </div>
     """, unsafe_allow_html=True)
     
-    ctl_c1, ctl_c2, ctl_c3, ctl_c4 = st.columns([1.5, 1.5, 2, 2])
+    target_machine_ids = [m["machine_id"] for m in machines] if machines else ["M1-CNC-01"]
+    anom_options = {
+        "COOLANT_FAILURE": "🔥 Heat / Coolant Failure",
+        "BEARING_WEAR": "⚡ Bearing Harmonic Wear",
+        "MOTOR_MISALIGN": "⚙️ Motor Misalignment",
+        "CATASTROPHIC_FAILURE": "💥 Sudden Breakdown"
+    }
+
+    ctl_c1, ctl_c2, ctl_c3, ctl_c4 = st.columns([1.4, 1.3, 1.8, 2.0])
     with ctl_c1:
-        if st.button("⏩ Step Simulation (+0.5h)", use_container_width=True):
+        if st.button("⏩ Step (+0.5h)", use_container_width=True, help="Advance simulation time by 30 minutes"):
             simulator.step(time_delta_hrs=0.5)
             st.rerun()
     with ctl_c2:
-        if st.button("🔄 Refresh Telemetry", use_container_width=True):
+        if st.button("🔄 Refresh Telemetry", use_container_width=True, help="Fetch latest telemetry readings"):
             simulator.step(time_delta_hrs=0.1)
             st.rerun()
     with ctl_c3:
-        if st.button("⚠️ Simulate Heat Anomaly on M1", use_container_width=True):
-            simulator.inject_anomaly("M1-CNC-01", "COOLANT_FAILURE")
-            st.warning("Injected Coolant Failure anomaly on M1-CNC-01! Telemetry will spike.")
-            st.rerun()
+        selected_mid = st.selectbox(
+            "Target Machine",
+            options=target_machine_ids,
+            index=0,
+            key="overview_ctrl_target_machine",
+            label_visibility="collapsed",
+            help="Select target workstation"
+        )
     with ctl_c4:
-        if st.button("🛠️ Perform Maintenance on M1", use_container_width=True):
-            simulator.perform_maintenance("M1-CNC-01")
-            st.success("Maintenance performed! M1-CNC-01 restored to healthy status.")
+        selected_anom = st.selectbox(
+            "Anomaly Type",
+            options=list(anom_options.keys()),
+            format_func=lambda k: anom_options[k],
+            index=0,
+            key="overview_ctrl_anom_type",
+            label_visibility="collapsed",
+            help="Select anomaly pattern to simulate"
+        )
+
+    act_c1, act_c2 = st.columns([1, 1])
+    short_id = selected_mid.split("-")[0] if "-" in selected_mid else selected_mid
+    anom_tag = anom_options.get(selected_anom, "Anomaly").split(" ")[1]
+    with act_c1:
+        if st.button(f"⚠️ Simulate {anom_tag} Anomaly on {short_id} ({selected_mid})", use_container_width=True):
+            simulator.inject_anomaly(selected_mid, selected_anom)
+            st.warning(f"Injected {anom_options[selected_anom]} on {selected_mid}! Sensor telemetry will spike.")
+            st.rerun()
+    with act_c2:
+        if st.button(f"🛠️ Perform Maintenance on {short_id} ({selected_mid})", use_container_width=True):
+            simulator.perform_maintenance(selected_mid)
+            st.success(f"Maintenance performed! {selected_mid} restored to healthy status.")
             st.rerun()
 
     # Recent Telemetry Log Table
