@@ -1,15 +1,18 @@
 """
 AI Production Optimizer Studio View
 Runs Google OR-Tools CP-SAT multi-objective schedule optimization,
-renders interactive Gantt timeline charts, and displays Before vs. After comparison metrics.
+renders interactive Gantt timeline charts, and displays Before vs. After comparison metrics with Dark/Light theme support.
 """
 import streamlit as st
 import pandas as pd
+from typing import Optional
 from ui.components import render_gantt_chart, render_before_after_comparison
 from optimization.scheduler import ProductionScheduler
 
 
-def render_optimizer_view(simulator, db):
+def render_optimizer_view(simulator, db, theme: Optional[str] = None):
+    current_theme = (theme or st.session_state.get("theme", "dark")).lower()
+
     st.markdown("""
     <div class="section-banner">
         <span>🧠</span> AI PRODUCTION SCHEDULING & MULTI-OBJECTIVE OPTIMIZATION
@@ -54,12 +57,12 @@ def render_optimizer_view(simulator, db):
         improvements = res["improvements"]
 
         # Before vs After Comparison Summary Cards
-        render_before_after_comparison(baseline, optimized, improvements)
+        render_before_after_comparison(baseline, optimized, improvements, theme=current_theme)
 
         # Interactive Gantt Chart
         st.markdown("##### 📅 Optimized Shop Floor Schedule Gantt Chart")
         st.plotly_chart(
-            render_gantt_chart(optimized["scheduled_orders"], title="AI-Optimized Multi-Machine Production Schedule"),
+            render_gantt_chart(optimized["scheduled_orders"], title="AI-Optimized Multi-Machine Production Schedule", theme=current_theme),
             use_container_width=True
         )
 
@@ -92,6 +95,6 @@ def render_optimizer_view(simulator, db):
         baseline = scheduler.build_naive_baseline_schedule(orders, machines)
         st.info("Showing current unoptimized baseline schedule. Click 'Run AI Production Optimization' above to generate an optimized schedule!")
         st.plotly_chart(
-            render_gantt_chart(baseline["scheduled_orders"], title="Current Naive Baseline Schedule (Unoptimized)"),
+            render_gantt_chart(baseline["scheduled_orders"], title="Current Naive Baseline Schedule (Unoptimized)", theme=current_theme),
             use_container_width=True
         )

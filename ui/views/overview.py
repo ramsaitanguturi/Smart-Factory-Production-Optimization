@@ -1,15 +1,19 @@
 """
 Factory Floor Overview & Digital Twin View
 Displays industrial workstations, live machine states, telemetry badges,
-and floor-wide status indicators.
+and floor-wide status indicators with Dark and Light theme adaptation.
 """
 import streamlit as st
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from config import STATUS_NORMAL, STATUS_WARNING, STATUS_CRITICAL, STATUS_MAINTENANCE, STATUS_FAILED
+from ui.styles import get_theme_palette
 
 
-def render_overview_view(simulator, db):
+def render_overview_view(simulator, db, theme: Optional[str] = None):
+    current_theme = (theme or st.session_state.get("theme", "dark")).lower()
+    pal = get_theme_palette(current_theme)
+
     st.markdown("""
     <div class="section-banner">
         <span>🏭</span> DIGITAL TWIN: FACTORY FLOOR WORKSTATIONS & CELL MATRIX
@@ -57,14 +61,15 @@ def render_overview_view(simulator, db):
                 dot_class = "dot-normal"
 
             m_orders = orders_by_machine.get(mid, [])
-            active_orders_str = f"{len(m_orders)} orders assigned" if m_orders else "Queue Idle"
+            health_clr = pal["accent_green"] if health >= 80 else pal["accent_amber"] if health >= 55 else pal["accent_red"]
+            fail_clr = pal["accent_red"] if fail_prob > 0.4 else pal["accent_amber"] if fail_prob > 0.15 else pal["accent_green"]
 
             card_html = f"""<div class="machine-card {status_class}">
 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
 <div>
-<span style="font-size: 0.72rem; color: #94a3b8; font-family: monospace;">{m['type']}</span>
-<div style="font-size: 1.15rem; font-weight: 700; color: #f8fafc; margin-top: 2px;">{m['name']}</div>
-<div style="font-size: 0.78rem; color: #64748b; font-family: monospace;">ID: {mid}</div>
+<span style="font-size: 0.72rem; color: {pal['text_muted']}; font-family: monospace;">{m['type']}</span>
+<div style="font-size: 1.15rem; font-weight: 700; color: {pal['text_primary']}; margin-top: 2px;">{m['name']}</div>
+<div style="font-size: 0.78rem; color: {pal['text_muted']}; font-family: monospace;">ID: {mid}</div>
 </div>
 <span class="badge-status {badge_class}">
 <span class="pulse-dot {dot_class}"></span> {status}
@@ -72,40 +77,40 @@ def render_overview_view(simulator, db):
 </div>
 <div style="margin: 12px 0 8px 0;">
 <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
-<span style="color: #94a3b8;">Health Index</span>
-<span style="font-weight: 700; color: {'#34d399' if health >= 80 else '#fbbf24' if health >= 55 else '#f87171'}; font-family: monospace;">{health:.1f}%</span>
+<span style="color: {pal['text_muted']};">Health Index</span>
+<span style="font-weight: 700; color: {health_clr}; font-family: monospace;">{health:.1f}%</span>
 </div>
-<div style="background: #1e293b; border-radius: 4px; height: 6px; overflow: hidden;">
-<div style="width: {health}%; background: {'#10b981' if health >= 80 else '#f59e0b' if health >= 55 else '#ef4444'}; height: 100%;"></div>
+<div style="background: {pal['track_bg']}; border-radius: 4px; height: 6px; overflow: hidden;">
+<div style="width: {health}%; background: {health_clr}; height: 100%;"></div>
 </div>
 </div>
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; margin-top: 10px; background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 6px; border: 1px solid #1e293b;">
+<div class="sub-stat-box">
 <div>
-<span style="color: #64748b;">Failure Risk:</span>
-<span style="font-weight: 700; color: {'#f87171' if fail_prob > 0.4 else '#fbbf24' if fail_prob > 0.15 else '#34d399'}; font-family: monospace;"> {(fail_prob*100):.1f}%</span>
-</div>
-<div>
-<span style="color: #64748b;">Op Hours:</span>
-<span style="font-family: monospace; color: #cbd5e1;"> {op_hours:.0f} h</span>
+<span style="color: {pal['text_muted']};">Failure Risk:</span>
+<span style="font-weight: 700; color: {fail_clr}; font-family: monospace;"> {(fail_prob*100):.1f}%</span>
 </div>
 <div>
-<span style="color: #64748b;">Temp:</span>
-<span style="font-family: monospace; color: {'#f87171' if telem.get('temperature', 60) > 85 else '#cbd5e1'};"> {telem.get('temperature', 62.0):.1f}°C</span>
+<span style="color: {pal['text_muted']};">Op Hours:</span>
+<span style="font-family: monospace; color: {pal['text_secondary']};"> {op_hours:.0f} h</span>
 </div>
 <div>
-<span style="color: #64748b;">Vib:</span>
-<span style="font-family: monospace; color: {'#f87171' if telem.get('vibration', 1.2) > 3.5 else '#cbd5e1'};"> {telem.get('vibration', 1.3):.2f} mm/s</span>
+<span style="color: {pal['text_muted']};">Temp:</span>
+<span style="font-family: monospace; color: {pal['accent_red'] if telem.get('temperature', 60) > 85 else pal['text_secondary']};"> {telem.get('temperature', 62.0):.1f}°C</span>
 </div>
 <div>
-<span style="color: #64748b;">Power:</span>
-<span style="font-family: monospace; color: #cbd5e1;"> {telem.get('power_kw', 18.0):.1f} kW</span>
+<span style="color: {pal['text_muted']};">Vib:</span>
+<span style="font-family: monospace; color: {pal['accent_red'] if telem.get('vibration', 1.2) > 3.5 else pal['text_secondary']};"> {telem.get('vibration', 1.3):.2f} mm/s</span>
 </div>
 <div>
-<span style="color: #64748b;">Orders:</span>
-<span style="font-family: monospace; color: #38bdf8;"> {len(m_orders)}</span>
+<span style="color: {pal['text_muted']};">Power:</span>
+<span style="font-family: monospace; color: {pal['text_secondary']};"> {telem.get('power_kw', 18.0):.1f} kW</span>
+</div>
+<div>
+<span style="color: {pal['text_muted']};">Orders:</span>
+<span style="font-family: monospace; color: {pal['accent_blue']};"> {len(m_orders)}</span>
 </div>
 </div>
-<div style="margin-top: 8px; font-size: 0.72rem; color: #94a3b8; font-style: italic;">
+<div style="margin-top: 8px; font-size: 0.72rem; color: {pal['text_muted']}; font-style: italic;">
 {telem.get('primary_cause', 'Normal Operation')}
 </div>
 </div>"""

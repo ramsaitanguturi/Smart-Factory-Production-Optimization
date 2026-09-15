@@ -1,6 +1,6 @@
 """
 AI-Based Smart Factory Production Optimization and Predictive Maintenance System
-Main Streamlit Application Entry Point
+Main Streamlit Application Entry Point with Dual Light & Dark Theme Support
 """
 import sys
 from pathlib import Path
@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-from ui.styles import apply_custom_styles
+from ui.styles import apply_custom_styles, get_theme_palette
 from ui.components import render_header, render_kpi_row
 from database.db_manager import DatabaseManager
 from simulation.factory_simulator import FactorySimulator
@@ -42,22 +42,48 @@ def get_system_instances():
     return st.session_state["simulator"], st.session_state["db"]
 
 
+def _on_theme_change():
+    choice = st.session_state.get("sidebar_theme_radio", "Dark")
+    st.session_state["theme"] = "light" if "Light" in choice else "dark"
+
+
 def main():
-    # Inject Custom Industrial SCADA Styles
-    st.markdown(apply_custom_styles(), unsafe_allow_html=True)
+    # Pre-sync theme state if user interacted with sidebar toggle
+    if "sidebar_theme_radio" in st.session_state:
+        st.session_state["theme"] = "light" if "Light" in st.session_state["sidebar_theme_radio"] else "dark"
+    elif "theme" not in st.session_state:
+        st.session_state["theme"] = "dark"
+
+    current_theme = st.session_state["theme"]
+    pal = get_theme_palette(current_theme)
+
+    # Inject Custom Industrial SCADA Styles (Theme-Aware)
+    st.markdown(apply_custom_styles(theme=current_theme), unsafe_allow_html=True)
 
     simulator, db = get_system_instances()
 
     # Sidebar Navigation & Industrial Controls
     with st.sidebar:
-        st.markdown("""
-        <div style="text-align: center; padding: 10px 0 16px 0; border-bottom: 1px solid #334155;">
+        st.markdown(f"""
+        <div style="text-align: center; padding: 10px 0 14px 0; border-bottom: 1px solid {pal['border_color']};">
             <div style="font-size: 2.2rem;">🏭</div>
-            <div style="font-size: 1.15rem; font-weight: 700; color: #38bdf8; font-family: 'JetBrains Mono';">SMART FACTORY 4.0</div>
-            <div style="font-size: 0.72rem; color: #94a3b8;">CLOSED-LOOP OPTIMIZATION</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: {pal['accent_blue']}; font-family: 'JetBrains Mono';">SMART FACTORY 4.0</div>
+            <div style="font-size: 0.72rem; color: {pal['text_muted']};">CLOSED-LOOP OPTIMIZATION</div>
         </div>
         """, unsafe_allow_html=True)
 
+        st.markdown("### 🎨 Theme Selector")
+        theme_mode = st.radio(
+            "Dashboard Theme:",
+            ["🌙 Dark SCADA", "☀️ Clean Light"],
+            index=0 if current_theme == "dark" else 1,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="sidebar_theme_radio",
+            on_change=_on_theme_change
+        )
+
+        st.markdown("---")
         st.markdown("### 🧭 Control Navigation")
         nav_choice = st.radio(
             "Select Operational View:",
@@ -95,8 +121,8 @@ def main():
             st.rerun()
 
         st.markdown("---")
-        st.markdown("""
-        <div style="font-size: 0.75rem; color: #64748b; line-height: 1.4;">
+        st.markdown(f"""
+        <div style="font-size: 0.75rem; color: {pal['text_muted']}; line-height: 1.4;">
             <b>Industry 4.0 Closed-Loop Stack</b><br>
             • Telemetry: Physics Simulator<br>
             • AI PdM: XGBoost & Random Forest<br>
@@ -112,25 +138,25 @@ def main():
     active_alerts = sum(1 for m in machines if m["status"] in ("WARNING", "CRITICAL", "FAILED"))
 
     # Render Header and Top KPI Bar
-    render_header(sim_time_hrs=simulator.simulation_time_hrs, alerts_count=active_alerts)
-    render_kpi_row(machines=machines, orders=orders)
+    render_header(sim_time_hrs=simulator.simulation_time_hrs, alerts_count=active_alerts, theme=current_theme)
+    render_kpi_row(machines=machines, orders=orders, theme=current_theme)
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # View Router
     if nav_choice == "🏭 Factory Overview & Twin":
-        render_overview_view(simulator, db)
+        render_overview_view(simulator, db, theme=current_theme)
     elif nav_choice == "🛠️ Predictive Maintenance":
-        render_maintenance_view(simulator, db)
+        render_maintenance_view(simulator, db, theme=current_theme)
     elif nav_choice == "📋 Production Orders Queue":
         render_production_view(simulator, db)
     elif nav_choice == "⚡ Energy & Power Analytics":
-        render_energy_view(simulator, db)
+        render_energy_view(simulator, db, theme=current_theme)
     elif nav_choice == "🧠 AI Production Optimizer":
-        render_optimizer_view(simulator, db)
+        render_optimizer_view(simulator, db, theme=current_theme)
     elif nav_choice == "🧪 What-If Simulation & Demo":
-        render_whatif_view(simulator, db)
+        render_whatif_view(simulator, db, theme=current_theme)
     elif nav_choice == "📊 ML Governance & Metrics":
-        render_model_metrics_view()
+        render_model_metrics_view(theme=current_theme)
 
 
 if __name__ == "__main__":

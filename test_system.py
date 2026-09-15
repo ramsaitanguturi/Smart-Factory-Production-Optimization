@@ -26,6 +26,8 @@ from models.energy_model import EnergyPredictionModel
 from models.delay_model import DelayPredictionModel
 from simulation.factory_simulator import FactorySimulator
 from optimization.scheduler import ProductionScheduler
+from ui.styles import apply_custom_styles, get_theme_palette
+from ui.components import render_gauge_chart, render_telemetry_history_chart, render_gantt_chart
 
 
 class TestSmartFactorySystem(unittest.TestCase):
@@ -388,6 +390,61 @@ class TestSmartFactorySystem(unittest.TestCase):
         self.assertGreater(len(failed_machines), 0)
         self.assertLessEqual(failed_machines["rul_hours"].max(), 35.0)
         print(" [PASS] BUG-15: Synthetic RUL continuously coupled to degradation physics.")
+
+    def test_19_theme_palette_and_css(self):
+        """Verify Light and Dark theme palettes and CSS style generation."""
+        dark_pal = get_theme_palette("dark")
+        light_pal = get_theme_palette("light")
+
+        self.assertEqual(dark_pal["name"], "dark")
+        self.assertEqual(light_pal["name"], "light")
+
+        # Verify contrast tokens
+        self.assertNotEqual(dark_pal["paper_bg"], light_pal["paper_bg"])
+        self.assertNotEqual(dark_pal["text_primary"], light_pal["text_primary"])
+        self.assertIn("#ffffff", light_pal["paper_bg"])
+        self.assertIn("#0f172a", light_pal["text_primary"])
+
+        # Verify CSS output contains respective theme tokens
+        dark_css = apply_custom_styles("dark")
+        light_css = apply_custom_styles("light")
+
+        self.assertIn("radial-gradient", dark_css)
+        self.assertIn("Inter", dark_css)
+        self.assertIn("#f8fafc", light_css)
+        self.assertIn("linear-gradient", light_css)
+        self.assertIn(".machine-card", light_css)
+        print(" [PASS] THEME-01: Light and Dark theme palettes and CSS generation verified.")
+
+    def test_20_chart_theme_adaptation(self):
+        """Verify Plotly charts successfully adapt to both Dark and Light themes."""
+        # 1. Gauge chart in both themes
+        dark_gauge = render_gauge_chart(value=75.0, title="Health", min_val=0, max_val=100, warn_thresh=60, crit_thresh=30, theme="dark")
+        light_gauge = render_gauge_chart(value=75.0, title="Health", min_val=0, max_val=100, warn_thresh=60, crit_thresh=30, theme="light")
+        self.assertIsNotNone(dark_gauge)
+        self.assertIsNotNone(light_gauge)
+        self.assertEqual(dark_gauge.data[0].gauge.bgcolor, "rgba(15, 23, 42, 0.8)")
+        self.assertEqual(light_gauge.data[0].gauge.bgcolor, "#f1f5f9")
+
+        # 2. Telemetry chart in both themes
+        import pandas as pd
+        df = pd.DataFrame({
+            "temperature": [65.0, 68.0, 70.0],
+            "vibration": [1.2, 1.4, 1.5],
+            "power_kw": [18.0, 19.0, 20.0]
+        })
+        dark_telem = render_telemetry_history_chart(df, "M1-CNC-01", theme="dark")
+        light_telem = render_telemetry_history_chart(df, "M1-CNC-01", theme="light")
+        self.assertEqual(dark_telem.layout.paper_bgcolor, "rgba(15, 23, 42, 0.6)")
+        self.assertEqual(light_telem.layout.paper_bgcolor, "#ffffff")
+
+        # 3. Gantt chart in both themes
+        orders = self.db.get_orders()[:3]
+        dark_gantt = render_gantt_chart(orders, "Schedule", theme="dark")
+        light_gantt = render_gantt_chart(orders, "Schedule", theme="light")
+        self.assertEqual(dark_gantt.layout.paper_bgcolor, "rgba(15, 23, 42, 0.6)")
+        self.assertEqual(light_gantt.layout.paper_bgcolor, "#ffffff")
+        print(" [PASS] THEME-02: Plotly charts dynamic theme adaptation verified.")
 
 
 if __name__ == "__main__":

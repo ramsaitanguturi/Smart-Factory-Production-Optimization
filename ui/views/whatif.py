@@ -2,14 +2,20 @@
 What-If Simulation & Guided Industry 4.0 Demonstration View
 Provides interactive scenario simulations and an automated 10-step guided demonstration flow:
 Data -> Monitoring -> AI Prediction -> Risk Detection -> Optimization -> Decision -> Simulation -> Dashboard
+Supports Dark and Light theme modes.
 """
 import streamlit as st
 import pandas as pd
+from typing import Optional
 from ui.components import render_before_after_comparison, render_gantt_chart
+from ui.styles import get_theme_palette
 from optimization.scheduler import ProductionScheduler
 
 
-def render_whatif_view(simulator, db):
+def render_whatif_view(simulator, db, theme: Optional[str] = None):
+    current_theme = (theme or st.session_state.get("theme", "dark")).lower()
+    pal = get_theme_palette(current_theme)
+
     st.markdown("""
     <div class="section-banner">
         <span>🧪</span> WHAT-IF SIMULATION & GUIDED INDUSTRY 4.0 DEMONSTRATION
@@ -99,10 +105,11 @@ def render_whatif_view(simulator, db):
             st.markdown("### Step 5: Affected Machine Transitions to CRITICAL State")
             st.error("The Factory Supervisory Controller flags `M1-CNC-01` as CRITICAL. An alarm ticker sounds on the shop floor.")
             m1 = db.get_machine("M1-CNC-01")
+            alarm_sub_color = pal["accent_red"] if current_theme == "light" else "#fca5a5"
             alarm_html = f"""<div class="machine-card status-critical">
-<div style="font-size: 1.3rem; font-weight: 700; color: #ef4444;">🚨 ALARM: {m1['name']} ({m1['machine_id']})</div>
-<div style="font-size: 0.9rem; color: #fca5a5; margin-top: 4px;">Status: {m1['status']} | Failure Probability: {(m1['failure_prob']*100):.1f}%</div>
-<div style="margin-top: 10px; font-size: 0.85rem; color: #cbd5e1;">Recommendation: Machine cannot safely complete urgent high-precision milling without catastrophic tool breakdown.</div>
+<div style="font-size: 1.3rem; font-weight: 700; color: {pal['accent_red']};">🚨 ALARM: {m1['name']} ({m1['machine_id']})</div>
+<div style="font-size: 0.9rem; color: {alarm_sub_color}; margin-top: 4px;">Status: {m1['status']} | Failure Probability: {(m1['failure_prob']*100):.1f}%</div>
+<div style="margin-top: 10px; font-size: 0.85rem; color: {pal['text_secondary']};">Recommendation: Machine cannot safely complete urgent high-precision milling without catastrophic tool breakdown.</div>
 </div>"""
             st.markdown(alarm_html, unsafe_allow_html=True)
 
@@ -138,7 +145,7 @@ def render_whatif_view(simulator, db):
             
             res = st.session_state["guided_opt_result"]
             st.plotly_chart(
-                render_gantt_chart(res["optimized"]["scheduled_orders"], title="Reallocated Production Schedule (Orders Shifted to M2-CNC-02)"),
+                render_gantt_chart(res["optimized"]["scheduled_orders"], title="Reallocated Production Schedule (Orders Shifted to M2-CNC-02)", theme=current_theme),
                 use_container_width=True
             )
 
@@ -149,7 +156,7 @@ def render_whatif_view(simulator, db):
                 st.session_state["guided_opt_result"] = scheduler.optimize_schedule(commit_to_db=False)
             
             res = st.session_state["guided_opt_result"]
-            render_before_after_comparison(res["baseline"], res["optimized"], res["improvements"])
+            render_before_after_comparison(res["baseline"], res["optimized"], res["improvements"], theme=current_theme)
 
         elif cur_step == 10:
             st.markdown("### Step 10: Closed-Loop Industry 4.0 Complete Demonstration Verified!")

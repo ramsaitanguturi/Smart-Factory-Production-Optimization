@@ -1,20 +1,25 @@
 """
 Machine Learning Model Diagnostics & Performance View
 Displays model evaluation metrics: Confusion Matrix, ROC-AUC, Precision, Recall,
-F1 score, and Feature Importance rankings for the Predictive Maintenance engine.
+F1 score, and Feature Importance rankings for the Predictive Maintenance engine with Dark/Light theme support.
 """
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import joblib
+from typing import Optional
 from pathlib import Path
 from config import MODELS_DIR
 from models.pdm_model import PredictiveMaintenanceModel
 from train_models import train_pdm_models
+from ui.styles import get_theme_palette
 
 
-def render_model_metrics_view():
+def render_model_metrics_view(theme: Optional[str] = None):
+    current_theme = (theme or st.session_state.get("theme", "dark")).lower()
+    pal = get_theme_palette(current_theme)
+
     st.markdown("""
     <div class="section-banner">
         <span>📊</span> PREDICTIVE MAINTENANCE ML MODEL GOVERNANCE & DIAGNOSTICS
@@ -60,9 +65,9 @@ def render_model_metrics_view():
             labels=dict(x="Predicted Class", y="Actual Class", color="Count")
         )
         fig_cm.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.6)",
-            plot_bgcolor="rgba(15, 23, 42, 0.8)",
-            font=dict(color="#cbd5e1"),
+            paper_bgcolor=pal["paper_bg"],
+            plot_bgcolor=pal["plot_bg"],
+            font=dict(color=pal["text_secondary"]),
             height=320,
             margin=dict(l=40, r=20, t=30, b=30)
         )
@@ -85,13 +90,13 @@ def render_model_metrics_view():
             color_continuous_scale="Viridis"
         )
         fig_feat.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.6)",
-            plot_bgcolor="rgba(15, 23, 42, 0.8)",
-            font=dict(color="#cbd5e1"),
+            paper_bgcolor=pal["paper_bg"],
+            plot_bgcolor=pal["plot_bg"],
+            font=dict(color=pal["text_secondary"]),
             height=320,
             margin=dict(l=40, r=20, t=30, b=30),
-            xaxis=dict(gridcolor="#1e293b", color="#94a3b8"),
-            yaxis=dict(gridcolor="#1e293b", color="#f8fafc")
+            xaxis=dict(gridcolor=pal["grid_color"], color=pal["text_muted"]),
+            yaxis=dict(gridcolor=pal["grid_color"], color=pal["text_primary"])
         )
         st.plotly_chart(fig_feat, use_container_width=True)
 

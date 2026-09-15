@@ -1,15 +1,20 @@
 """
 Predictive Maintenance (PdM) Studio View
 Deep-dive telemetry inspection, ML failure probability dials,
-Remaining Useful Life (RUL) forecasting, and prescriptive maintenance actions.
+Remaining Useful Life (RUL) forecasting, and prescriptive maintenance actions with Dark/Light theme support.
 """
 import streamlit as st
 import pandas as pd
+from typing import Optional
 from ui.components import render_gauge_chart, render_telemetry_history_chart
+from ui.styles import get_theme_palette
 from config import STATUS_NORMAL, STATUS_WARNING, STATUS_CRITICAL, STATUS_MAINTENANCE, STATUS_FAILED
 
 
-def render_maintenance_view(simulator, db):
+def render_maintenance_view(simulator, db, theme: Optional[str] = None):
+    current_theme = (theme or st.session_state.get("theme", "dark")).lower()
+    pal = get_theme_palette(current_theme)
+
     st.markdown("""
     <div class="section-banner">
         <span>🛠️</span> PREDICTIVE MAINTENANCE & MACHINE HEALTH DIAGNOSTICS
@@ -42,7 +47,8 @@ def render_maintenance_view(simulator, db):
                     warn_thresh=65,
                     crit_thresh=35,
                     unit="%",
-                    reverse_hazard=True
+                    reverse_hazard=True,
+                    theme=current_theme
                 ),
                 use_container_width=True
             )
@@ -56,7 +62,8 @@ def render_maintenance_view(simulator, db):
                     max_val=100,
                     warn_thresh=25,
                     crit_thresh=60,
-                    unit="% Risk"
+                    unit="% Risk",
+                    theme=current_theme
                 ),
                 use_container_width=True
             )
@@ -65,22 +72,22 @@ def render_maintenance_view(simulator, db):
             rul_hours = telem.get("rul_hours", 650.0)
             status = m_data["status"]
             
-            m_status_html = f"""<div style="background: rgba(15,23,42,0.85); border: 1px solid #334155; border-radius: 10px; padding: 16px; height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
+            m_status_html = f"""<div style="background: {pal['status_box_bg']}; border: 1px solid {pal['status_box_border']}; border-radius: 10px; padding: 16px; height: 180px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
 <div>
 <div style="display: flex; justify-content: space-between; align-items: center;">
-<span style="font-size: 0.8rem; color: #94a3b8; font-family: monospace;">STATUS & RUL PROGNOSIS</span>
+<span style="font-size: 0.8rem; color: {pal['text_muted']}; font-family: monospace;">STATUS & RUL PROGNOSIS</span>
 <span class="badge-status {'badge-normal' if status == STATUS_NORMAL else 'badge-warning' if status == STATUS_WARNING else 'badge-critical'}">
 {status}
 </span>
 </div>
-<div style="font-size: 1.5rem; font-weight: 700; color: #38bdf8; font-family: 'JetBrains Mono'; margin-top: 6px;">
+<div style="font-size: 1.5rem; font-weight: 700; color: {pal['accent_blue']}; font-family: 'JetBrains Mono'; margin-top: 6px;">
 {rul_hours:.0f} Operating Hours
 </div>
-<div style="font-size: 0.75rem; color: #64748b;">Estimated Remaining Useful Life (RUL)</div>
+<div style="font-size: 0.75rem; color: {pal['text_muted']};">Estimated Remaining Useful Life (RUL)</div>
 </div>
-<div style="background: rgba(30,41,59,0.5); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #38bdf8;">
-<div style="font-size: 0.72rem; color: #94a3b8;">PRIMARY DEGRADATION CAUSE:</div>
-<div style="font-size: 0.82rem; font-weight: 600; color: #f1f5f9;">{telem.get('primary_cause', 'Normal Operation')}</div>
+<div style="background: {pal['sub_box_bg']}; padding: 8px 12px; border-radius: 6px; border-left: 3px solid {pal['sub_box_border']};">
+<div style="font-size: 0.72rem; color: {pal['text_muted']}; font-weight: 600;">PRIMARY DEGRADATION CAUSE:</div>
+<div style="font-size: 0.82rem; font-weight: 600; color: {pal['text_primary']};">{telem.get('primary_cause', 'Normal Operation')}</div>
 </div>
 </div>"""
             st.markdown(m_status_html, unsafe_allow_html=True)
@@ -90,34 +97,34 @@ def render_maintenance_view(simulator, db):
         g1, g2, g3, g4, g5 = st.columns(5)
         with g1:
             st.plotly_chart(
-                render_gauge_chart(telem.get("temperature", 65.0), "Temperature", 30, 130, 85, 105, "°C"),
+                render_gauge_chart(telem.get("temperature", 65.0), "Temperature", 30, 130, 85, 105, "°C", theme=current_theme),
                 use_container_width=True
             )
         with g2:
             st.plotly_chart(
-                render_gauge_chart(telem.get("vibration", 1.4), "Vibration", 0.0, 8.0, 3.5, 5.5, "mm/s RMS"),
+                render_gauge_chart(telem.get("vibration", 1.4), "Vibration", 0.0, 8.0, 3.5, 5.5, "mm/s RMS", theme=current_theme),
                 use_container_width=True
             )
         with g3:
             st.plotly_chart(
-                render_gauge_chart(telem.get("rpm", 8000), "Motor Spindle", 0, m_data["max_rpm"], m_data["max_rpm"] * 0.75, m_data["max_rpm"] * 0.45, "RPM", reverse_hazard=True),
+                render_gauge_chart(telem.get("rpm", 8000), "Motor Spindle", 0, m_data["max_rpm"], m_data["max_rpm"] * 0.75, m_data["max_rpm"] * 0.45, "RPM", reverse_hazard=True, theme=current_theme),
                 use_container_width=True
             )
         with g4:
             st.plotly_chart(
-                render_gauge_chart(telem.get("pressure", 105.0), "Hydraulic Pressure", 0, 150, 75, 55, "bar", reverse_hazard=True),
+                render_gauge_chart(telem.get("pressure", 105.0), "Hydraulic Pressure", 0, 150, 75, 55, "bar", reverse_hazard=True, theme=current_theme),
                 use_container_width=True
             )
         with g5:
             st.plotly_chart(
-                render_gauge_chart(telem.get("power_kw", 18.0), "Power Draw", 0, m_data["nominal_power_kw"] * 1.5, m_data["nominal_power_kw"] * 1.15, m_data["nominal_power_kw"] * 1.35, "kW"),
+                render_gauge_chart(telem.get("power_kw", 18.0), "Power Draw", 0, m_data["nominal_power_kw"] * 1.5, m_data["nominal_power_kw"] * 1.15, m_data["nominal_power_kw"] * 1.35, "kW", theme=current_theme),
                 use_container_width=True
             )
 
         # Historical Sensor Trends Chart
         history_df = db.get_recent_telemetry(machine_id=selected_mid, limit=40)
         if not history_df.empty:
-            st.plotly_chart(render_telemetry_history_chart(history_df, selected_mid), use_container_width=True)
+            st.plotly_chart(render_telemetry_history_chart(history_df, selected_mid, theme=current_theme), use_container_width=True)
 
         # Prescriptive Recommendation & Maintenance Actions
         st.markdown("""

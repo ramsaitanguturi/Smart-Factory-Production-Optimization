@@ -1,17 +1,21 @@
 """
 Energy Prediction & Analytics View
 Monitors real-time power draw (kW), machine-level energy shares,
-24-hour forecasted consumption, and degradation-induced energy waste.
+24-hour forecasted consumption, and degradation-induced energy waste with Dark/Light theme support.
 """
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from config import MACHINES, ENERGY_PEAK_TARIFF, ENERGY_OFFPEAK_TARIFF
+from ui.styles import get_theme_palette
 
 
-def render_energy_view(simulator, db):
+def render_energy_view(simulator, db, theme: Optional[str] = None):
+    current_theme = (theme or st.session_state.get("theme", "dark")).lower()
+    pal = get_theme_palette(current_theme)
+
     st.markdown("""
     <div class="section-banner">
         <span>⚡</span> FACTORY ENERGY CONSUMPTION & POWER DEMAND FORECAST
@@ -77,8 +81,8 @@ def render_energy_view(simulator, db):
             color_discrete_sequence=px.colors.sequential.Tealgrn
         )
         fig_donut.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.6)",
-            font=dict(color="#cbd5e1"),
+            paper_bgcolor=pal["paper_bg"],
+            font=dict(color=pal["text_secondary"]),
             height=320,
             margin=dict(l=20, r=20, t=30, b=20)
         )
@@ -87,7 +91,6 @@ def render_energy_view(simulator, db):
     with col_right:
         st.markdown("##### 📈 24-Hour Projected Load Profile vs. Tariff Window")
         hours = list(range(24))
-        # Simulated factory load curve
         base_curve = [
             total_active_kw * (0.6 if h < 6 else 1.05 if 8 <= h <= 17 else 0.8)
             for h in hours
@@ -99,7 +102,7 @@ def render_energy_view(simulator, db):
             y=base_curve,
             mode="lines+markers",
             name="Forecasted Load (kW)",
-            line=dict(color="#38bdf8", width=3)
+            line=dict(color=pal["accent_blue"], width=3)
         ))
         
         # Highlight peak tariff window (14:00 to 19:00)
@@ -110,17 +113,17 @@ def render_energy_view(simulator, db):
             line_color="rgba(239, 68, 68, 0.5)",
             annotation_text="PEAK TARIFF ($0.28/kWh)",
             annotation_position="top left",
-            annotation_font=dict(color="#f87171", size=10)
+            annotation_font=dict(color=pal["accent_red"], size=10)
         )
 
         fig_line.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.6)",
-            plot_bgcolor="rgba(15, 23, 42, 0.8)",
-            font=dict(color="#cbd5e1"),
+            paper_bgcolor=pal["paper_bg"],
+            plot_bgcolor=pal["plot_bg"],
+            font=dict(color=pal["text_secondary"]),
             height=320,
             margin=dict(l=40, r=20, t=30, b=30),
-            xaxis=dict(title="Hour of Day (0 - 23)", gridcolor="#1e293b"),
-            yaxis=dict(title="Power (kW)", gridcolor="#1e293b")
+            xaxis=dict(title="Hour of Day (0 - 23)", gridcolor=pal["grid_color"], color=pal["text_muted"]),
+            yaxis=dict(title="Power (kW)", gridcolor=pal["grid_color"], color=pal["text_muted"])
         )
         st.plotly_chart(fig_line, use_container_width=True)
 
