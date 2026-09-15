@@ -20,6 +20,18 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
     </div>
     """, unsafe_allow_html=True)
 
+    # High-visibility Status Badge Legend matching GUIDE.md specifications
+    st.markdown(f"""
+    <div class="status-legend-bar">
+        <span style="font-weight: 700; color: {pal['text_primary']}; margin-right: 4px;">Status Guide:</span>
+        <span class="status-legend-item"><span class="badge-status badge-normal"><span class="pulse-dot dot-normal"></span> NORMAL</span> <span style="color: {pal['text_muted']}; font-size: 0.75rem;">(Safe)</span></span>
+        <span class="status-legend-item"><span class="badge-status badge-warning"><span class="pulse-dot dot-warning"></span> WARNING</span> <span style="color: {pal['text_muted']}; font-size: 0.75rem;">(Elevated)</span></span>
+        <span class="status-legend-item"><span class="badge-status badge-critical"><span class="pulse-dot dot-critical"></span> CRITICAL</span> <span style="color: {pal['text_muted']}; font-size: 0.75rem;">(Pulsing Risk)</span></span>
+        <span class="status-legend-item"><span class="badge-status badge-failed"><span class="pulse-dot dot-failed"></span> FAILED</span> <span style="color: {pal['text_muted']}; font-size: 0.75rem;">(Halted)</span></span>
+        <span class="status-legend-item"><span class="badge-status badge-maintenance"><span class="pulse-dot dot-maintenance"></span> MAINTENANCE</span> <span style="color: {pal['text_muted']}; font-size: 0.75rem;">(Offline)</span></span>
+    </div>
+    """, unsafe_allow_html=True)
+
     # Machine Cells Display
     machines = db.get_machines()
     orders = db.get_orders()
@@ -51,14 +63,18 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
                 status_class = "status-warning"
                 badge_class = "badge-warning"
                 dot_class = "dot-warning"
-            elif status in (STATUS_CRITICAL, STATUS_FAILED):
+            elif status == STATUS_CRITICAL:
                 status_class = "status-critical"
                 badge_class = "badge-critical"
                 dot_class = "dot-critical"
+            elif status == STATUS_FAILED:
+                status_class = "status-failed"
+                badge_class = "badge-failed"
+                dot_class = "dot-failed"
             elif status == STATUS_MAINTENANCE:
-                status_class = "status-normal"
+                status_class = "status-maintenance"
                 badge_class = "badge-maintenance"
-                dot_class = "dot-normal"
+                dot_class = "dot-maintenance"
 
             m_orders = orders_by_machine.get(mid, [])
             health_clr = pal["accent_green"] if health >= 80 else pal["accent_amber"] if health >= 55 else pal["accent_red"]
@@ -169,13 +185,13 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
 
     muted_clr = pal["text_muted"]
     blue_clr = pal["accent_blue"]
-    st.markdown(f"<div style='font-size: 0.78rem; color: {muted_clr}; margin: 8px 0 4px 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;'>⚡ 1-Click Anomaly Injections for <span style='color: {blue_clr};'>{selected_mid}</span>:</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size: 0.78rem; color: {muted_clr}; margin: 8px 0 4px 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;'>⚡ 1-Click Status Simulation & Anomalies for <span style='color: {blue_clr};'>{selected_mid}</span>:</div>", unsafe_allow_html=True)
 
-    anom_c1, anom_c2, anom_c3, anom_c4 = st.columns(4)
+    anom_c1, anom_c2, anom_c3, anom_c4, anom_c5 = st.columns(5)
     with anom_c1:
-        if st.button("🔥 Heat / Coolant Spike", use_container_width=True, help=f"Inject rapid overheating and pressure loss on {selected_mid}"):
+        if st.button("🔥 Coolant Spike", use_container_width=True, help=f"Inject rapid overheating and pressure loss on {selected_mid} (CRITICAL Red)"):
             simulator.inject_anomaly(selected_mid, "COOLANT_FAILURE")
-            msg = f"🔥 Injected Coolant Failure anomaly on {selected_mid}! Temperature & pressure spiking."
+            msg = f"🔥 Injected Coolant Failure anomaly on {selected_mid}! Spindle overheating -> CRITICAL state."
             st.session_state["overview_feedback"] = ("warning", msg)
             try:
                 st.toast(msg, icon="🔥")
@@ -183,9 +199,9 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
                 pass
             st.rerun()
     with anom_c2:
-        if st.button("⚡ Bearing Harmonic Wear", use_container_width=True, help=f"Inject severe vibration surge on {selected_mid}"):
+        if st.button("⚡ Bearing Wear", use_container_width=True, help=f"Inject severe vibration surge on {selected_mid} (WARNING Amber)"):
             simulator.inject_anomaly(selected_mid, "BEARING_WEAR")
-            msg = f"⚡ Injected Bearing Wear anomaly on {selected_mid}! Vibration surging."
+            msg = f"⚡ Injected Bearing Wear anomaly on {selected_mid}! Vibration surging -> WARNING state."
             st.session_state["overview_feedback"] = ("warning", msg)
             try:
                 st.toast(msg, icon="⚡")
@@ -193,9 +209,9 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
                 pass
             st.rerun()
     with anom_c3:
-        if st.button("⚙️ Motor Misalignment", use_container_width=True, help=f"Inject RPM fluctuation & erratic current on {selected_mid}"):
+        if st.button("⚙️ Motor Misalign", use_container_width=True, help=f"Inject RPM fluctuation on {selected_mid} (WARNING Amber)"):
             simulator.inject_anomaly(selected_mid, "MOTOR_MISALIGN")
-            msg = f"⚙️ Injected Motor Misalignment on {selected_mid}! RPM and power fluctuating."
+            msg = f"⚙️ Injected Motor Misalignment on {selected_mid}! RPM deviating -> WARNING state."
             st.session_state["overview_feedback"] = ("warning", msg)
             try:
                 st.toast(msg, icon="⚙️")
@@ -203,12 +219,22 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
                 pass
             st.rerun()
     with anom_c4:
-        if st.button("💥 Sudden Breakdown", use_container_width=True, help=f"Trigger critical emergency breakdown on {selected_mid}"):
+        if st.button("💥 Breakdown", use_container_width=True, help=f"Trigger critical emergency halt on {selected_mid} (FAILED Dark Red)"):
             simulator.inject_anomaly(selected_mid, "CATASTROPHIC_FAILURE")
-            msg = f"💥 Injected Catastrophic Breakdown on {selected_mid}! Machine halted."
+            msg = f"💥 Injected Catastrophic Breakdown on {selected_mid}! Machine halted -> FAILED state."
             st.session_state["overview_feedback"] = ("error", msg)
             try:
                 st.toast(msg, icon="💥")
+            except Exception:
+                pass
+            st.rerun()
+    with anom_c5:
+        if st.button("🔧 Maintenance", use_container_width=True, help=f"Place {selected_mid} offline for overhaul (MAINTENANCE Blue)"):
+            simulator.set_maintenance(selected_mid, in_maintenance=True)
+            msg = f"🔧 {selected_mid} is now offline for technician overhaul -> MAINTENANCE state."
+            st.session_state["overview_feedback"] = ("success", msg)
+            try:
+                st.toast(msg, icon="🔧")
             except Exception:
                 pass
             st.rerun()
@@ -217,11 +243,20 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
     st.markdown("##### 📡 Real-time Sensor Data Stream (Latest 12 Readings)")
     recent_telem = db.get_recent_telemetry(limit=12)
     if not recent_telem.empty:
+        status_emoji_map = {
+            "NORMAL": "🟢 NORMAL",
+            "WARNING": "🟡 WARNING",
+            "CRITICAL": "🔴 CRITICAL",
+            "FAILED": "🛑 FAILED",
+            "MAINTENANCE": "🔵 MAINTENANCE"
+        }
+        display_df = recent_telem[[
+            "timestamp", "machine_id", "temperature", "vibration",
+            "rpm", "pressure", "power_kw", "health_score", "failure_prob", "status"
+        ]].copy()
+        display_df["status"] = display_df["status"].apply(lambda s: status_emoji_map.get(str(s).upper(), str(s)))
         st.dataframe(
-            recent_telem[[
-                "timestamp", "machine_id", "temperature", "vibration",
-                "rpm", "pressure", "power_kw", "health_score", "failure_prob", "status"
-            ]],
+            display_df,
             use_container_width=True,
             hide_index=True
         )

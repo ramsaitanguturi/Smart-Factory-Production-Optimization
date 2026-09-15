@@ -110,7 +110,7 @@ class FactorySimulator:
                 cause = "Maintenance in Progress"
                 recom = "Inspection / servicing ongoing."
                 new_status = STATUS_MAINTENANCE
-            elif current_status == STATUS_FAILED or anom.get("type") == "CATASTROPHIC_FAILURE":
+            elif anom.get("type") == "CATASTROPHIC_FAILURE" or (current_status == STATUS_FAILED and not anom.get("active")):
                 reading = self.generator.generate_single_reading(
                     machine_id=mid,
                     current_status=STATUS_FAILED,
@@ -320,6 +320,52 @@ class FactorySimulator:
             health_restored_to=98.5
         )
         self.step(time_delta_hrs=0.05)
+
+    def set_maintenance(self, machine_id: str, in_maintenance: bool = True):
+        """Sets or removes a machine from offline maintenance status."""
+        self.anomaly_states[machine_id] = {
+            "active": False,
+            "type": None,
+            "factor": 0.0,
+            "temp_boost": 0.0,
+            "vib_boost": 0.0,
+            "pres_drop": 0.0
+        }
+        if in_maintenance:
+            m_info = self.db.get_machine(machine_id) or {}
+            op_h = m_info.get("operating_hours", 100.0)
+            self.db.update_machine_state(
+                machine_id=machine_id,
+                status=STATUS_MAINTENANCE,
+                health_score=98.0,
+                failure_prob=0.005,
+                operating_hours=op_h
+            )
+            reading = self.generator.generate_single_reading(
+                machine_id=machine_id,
+                current_status=STATUS_MAINTENANCE,
+                operating_hours=op_h
+            )
+            reading["health_score"] = 98.0
+            reading["failure_prob"] = 0.005
+            reading["primary_cause"] = "Maintenance in Progress"
+            reading["recommendation"] = "Inspection / servicing ongoing."
+            reading["rul_hours"] = 720.0
+            reading["status"] = STATUS_MAINTENANCE
+            self.latest_telemetry[machine_id] = reading
+            self.db.record_telemetry(
+                machine_id=machine_id,
+                temp=reading["temperature"],
+                vib=reading["vibration"],
+                rpm=reading["rpm"],
+                pressure=reading["pressure"],
+                power=reading["power_kw"],
+                health=98.0,
+                fail_prob=0.005,
+                status=STATUS_MAINTENANCE
+            )
+        else:
+            self.perform_maintenance(machine_id)
 
     def inject_rush_orders(self, count: int = 3):
         """Injects urgent high-priority customer orders to stress the schedule."""

@@ -95,25 +95,53 @@ html, body, [class*="css"] {
     100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
+@keyframes pulse-dot {
+    0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    50% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+    100% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
 /* Status Badges */
 .badge-status {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 0.25rem 0.65rem;
+    gap: 7px;
+    padding: 0.32rem 0.75rem;
     border-radius: 9999px;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     font-family: 'JetBrains Mono', monospace;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+    transition: all 0.2s ease;
 }
 
-/* Live Pulse Dot */
+/* Live Pulse Dot Base */
 .pulse-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     display: inline-block;
+    flex-shrink: 0;
+}
+
+/* Status Legend Bar */
+.status-legend-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.2rem;
+    font-size: 0.8rem;
+}
+
+.status-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
 }
 
 /* KPI Card Base */
@@ -271,8 +299,12 @@ DARK_THEME_CSS = """
     animation: pulse-border-dark 2s infinite;
 }
 .machine-card.status-failed {
-    border-left: 5px solid #dc2626;
+    border-left: 5px solid #7f1d1d;
     background: rgba(45, 10, 15, 0.95);
+}
+.machine-card.status-maintenance {
+    border-left: 5px solid #3b82f6;
+    background: rgba(15, 28, 48, 0.9);
 }
 
 .sub-stat-box {
@@ -282,31 +314,49 @@ DARK_THEME_CSS = """
 }
 
 /* Badges Dark */
-.badge-normal {
-    background: rgba(16, 185, 129, 0.15);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+.badge-status.badge-normal, .badge-normal {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: #34d399 !important;
+    border: 1.5px solid rgba(16, 185, 129, 0.45) !important;
 }
-.badge-warning {
-    background: rgba(245, 158, 11, 0.15);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.3);
+.badge-status.badge-warning, .badge-warning {
+    background: rgba(245, 158, 11, 0.2) !important;
+    color: #fbbf24 !important;
+    border: 1.5px solid rgba(245, 158, 11, 0.45) !important;
 }
-.badge-critical {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.4);
+.badge-status.badge-critical, .badge-critical {
+    background: rgba(239, 68, 68, 0.25) !important;
+    color: #f87171 !important;
+    border: 1.5px solid rgba(239, 68, 68, 0.55) !important;
 }
-.badge-maintenance {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+.badge-status.badge-failed, .badge-failed {
+    background: rgba(127, 29, 29, 0.4) !important;
+    color: #fca5a5 !important;
+    border: 1.5px solid rgba(220, 38, 38, 0.6) !important;
+}
+.badge-status.badge-maintenance, .badge-maintenance {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #60a5fa !important;
+    border: 1.5px solid rgba(59, 130, 246, 0.45) !important;
 }
 
 /* Live Pulse Dots Dark */
 .pulse-dot.dot-normal { background: #10b981; box-shadow: 0 0 8px #10b981; }
 .pulse-dot.dot-warning { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
-.pulse-dot.dot-critical { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.pulse-dot.dot-critical {
+    background: #ef4444;
+    box-shadow: 0 0 10px #ef4444;
+    animation: pulse-dot 1.5s infinite ease-in-out;
+}
+.pulse-dot.dot-failed { background: #7f1d1d; box-shadow: 0 0 8px #b91c1c; }
+.pulse-dot.dot-maintenance { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+
+/* Status Legend Dark */
+.status-legend-bar {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid #1e293b;
+    color: #cbd5e1;
+}
 
 /* Section Banner Dark */
 .section-banner {
@@ -579,8 +629,12 @@ div[data-testid="stAlert"] span {
     animation: pulse-border-light 2s infinite;
 }
 .machine-card.status-failed {
-    border-left: 5px solid #b91c1c;
+    border-left: 5px solid #7f1d1d;
     background: #fee2e2;
+}
+.machine-card.status-maintenance {
+    border-left: 5px solid #0284c7;
+    background: #f0f9ff;
 }
 
 .sub-stat-box {
@@ -589,32 +643,50 @@ div[data-testid="stAlert"] span {
     color: #334155;
 }
 
-/* Badges Light */
-.badge-normal {
-    background: rgba(16, 185, 129, 0.14);
-    color: #047857;
-    border: 1px solid rgba(16, 185, 129, 0.35);
+/* Badges Light - High specificity with !important */
+.badge-status.badge-normal, .badge-normal {
+    background: rgba(16, 185, 129, 0.16) !important;
+    color: #047857 !important;
+    border: 1.5px solid rgba(16, 185, 129, 0.45) !important;
 }
-.badge-warning {
-    background: rgba(245, 158, 11, 0.14);
-    color: #b45309;
-    border: 1px solid rgba(245, 158, 11, 0.35);
+.badge-status.badge-warning, .badge-warning {
+    background: rgba(245, 158, 11, 0.16) !important;
+    color: #b45309 !important;
+    border: 1.5px solid rgba(245, 158, 11, 0.45) !important;
 }
-.badge-critical {
-    background: rgba(239, 68, 68, 0.14);
-    color: #b91c1c;
-    border: 1px solid rgba(239, 68, 68, 0.35);
+.badge-status.badge-critical, .badge-critical {
+    background: rgba(239, 68, 68, 0.16) !important;
+    color: #dc2626 !important;
+    border: 1.5px solid rgba(239, 68, 68, 0.45) !important;
 }
-.badge-maintenance {
-    background: rgba(59, 130, 246, 0.14);
-    color: #1d4ed8;
-    border: 1px solid rgba(59, 130, 246, 0.35);
+.badge-status.badge-failed, .badge-failed {
+    background: rgba(127, 29, 29, 0.18) !important;
+    color: #7f1d1d !important;
+    border: 1.5px solid rgba(185, 28, 28, 0.5) !important;
+}
+.badge-status.badge-maintenance, .badge-maintenance {
+    background: rgba(2, 132, 199, 0.16) !important;
+    color: #0369a1 !important;
+    border: 1.5px solid rgba(2, 132, 199, 0.45) !important;
 }
 
 /* Live Pulse Dots Light */
 .pulse-dot.dot-normal { background: #059669; box-shadow: 0 0 8px rgba(5, 150, 105, 0.6); }
 .pulse-dot.dot-warning { background: #d97706; box-shadow: 0 0 8px rgba(217, 119, 6, 0.6); }
-.pulse-dot.dot-critical { background: #dc2626; box-shadow: 0 0 8px rgba(220, 38, 38, 0.6); }
+.pulse-dot.dot-critical {
+    background: #dc2626;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.7);
+    animation: pulse-dot 1.5s infinite ease-in-out;
+}
+.pulse-dot.dot-failed { background: #7f1d1d; box-shadow: 0 0 8px rgba(127, 29, 29, 0.6); }
+.pulse-dot.dot-maintenance { background: #0284c7; box-shadow: 0 0 8px rgba(2, 132, 199, 0.6); }
+
+/* Status Legend Light */
+.status-legend-bar {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+}
 
 /* Section Banner Light */
 .section-banner {

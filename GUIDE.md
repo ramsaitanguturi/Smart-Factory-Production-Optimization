@@ -226,11 +226,11 @@ The 6 industrial workstations are displayed in a clean 3-column grid:
 #### Inside Each Workstation Card:
 - **Machine Type & Name**: Clear identification and workstation ID.
 - **Status Badge**:
-  - `NORMAL` (Green): Machine operating safely within all tolerances.
-  - `WARNING` (Amber): Elevated vibration, temperature, or pressure deviation detected by AI.
-  - `CRITICAL` (Red with pulsing dot): Severe failure imminent within hours; emergency attention required.
-  - `FAILED` (Dark Red): Machine has suffered catastrophic failure and halted.
-  - `MAINTENANCE` (Blue): Machine is currently offline for technician overhaul.
+  - 🟢 **`NORMAL` (Emerald Green)**: Machine operating safely within all tolerances.
+  - 🟡 **`WARNING` (Amber Orange)**: Elevated vibration, temperature, or pressure deviation detected by AI.
+  - 🔴 **`CRITICAL` (Crimson Red with pulsing dot)**: Severe failure imminent within hours; emergency attention required.
+  - 🛑 **`FAILED` (Dark Maroon Red)**: Machine has suffered catastrophic failure and halted.
+  - 🔵 **`MAINTENANCE` (Royal Blue)**: Machine is currently offline for technician overhaul.
 - **Health Index Bar**: A progress bar showing physical asset health ($0\% - 100\%$).
 - **Sub-Stat Telemetry Box**:
   - **Failure Risk**: AI-predicted failure probability ($0.0\% - 100\%$).
