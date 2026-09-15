@@ -119,9 +119,12 @@ class TestSmartFactorySystem(unittest.TestCase):
     def test_06_order_progression(self):
         """BUG-01: Verify step() decrements order processing time and completes finished jobs."""
         test_oid = "ORD-TEST-PROG"
+        target_mid = "M1-CNC-01"
         try:
             with self.db.get_connection() as conn:
                 conn.execute("DELETE FROM production_orders WHERE order_id = ?", (test_oid,))
+                # Clean isolation for target machine (BUG-11 single-machine concurrency)
+                conn.execute("UPDATE production_orders SET assigned_machine_id = NULL WHERE assigned_machine_id = ?", (target_mid,))
                 conn.commit()
 
             self.db.add_order(
@@ -371,6 +374,20 @@ class TestSmartFactorySystem(unittest.TestCase):
         self.assertTrue(self.scheduler.is_machine_high_risk(prob_m))
         self.assertTrue(self.scheduler.is_machine_high_risk(health_m))
         print(" [PASS] BUG-14: Machine risk evaluation standardized across baseline and CP-SAT.")
+
+    def test_18_bug15_rul_continuous_physics(self):
+        """BUG-15: Verify synthetic RUL is grounded in continuous degradation physics."""
+        df = self.generator.generate_training_dataset(n_samples=500)
+        # Healthy low-hour machines should have high RUL (> 400h)
+        healthy_low_hours = df[(df["failure"] == 0) & (df["operating_hours"] < 1500) & (df["temperature"] < 72.0) & (df["vibration"] < 1.8)]
+        self.assertGreater(len(healthy_low_hours), 0)
+        self.assertGreater(healthy_low_hours["rul_hours"].mean(), 400.0)
+
+        # Failed machines must have low RUL (<= 35h)
+        failed_machines = df[df["failure"] == 1]
+        self.assertGreater(len(failed_machines), 0)
+        self.assertLessEqual(failed_machines["rul_hours"].max(), 35.0)
+        print(" [PASS] BUG-15: Synthetic RUL continuously coupled to degradation physics.")
 
 
 if __name__ == "__main__":

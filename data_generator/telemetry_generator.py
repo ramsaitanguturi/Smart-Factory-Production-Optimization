@@ -211,13 +211,21 @@ class TelemetryGenerator:
                 (anomaly >= 0.78)
             )
 
-            # RUL calculation in hours
+            # RUL calculation grounded in continuous degradation physics (BUG-15)
+            health_proxy = 100.0 - (
+                (max(0.0, temp - 70.0) / 40.0) * 35.0 +
+                (max(0.0, vib - 2.0) / 4.0) * 40.0 +
+                (max(0.0, 95.0 - pres) / 50.0) * 15.0 +
+                (wear_factor * 10.0)
+            )
+            health_proxy = max(2.0, min(100.0, health_proxy))
+            
+            rul_base = ((health_proxy / 100.0) ** 1.5) * 800.0 * max(0.05, 1.0 - (hours / 5500.0))
+            eps_rul = float(self.rng.normal(0, 10.0))
             if is_failure:
-                rul_hrs = self.rng.uniform(1.0, 35.0)
-            elif anomaly > 0.45:
-                rul_hrs = self.rng.uniform(40.0, 180.0)
+                rul_hrs = max(1.0, min(35.0, rul_base * 0.15 + self.rng.uniform(1.0, 10.0)))
             else:
-                rul_hrs = self.rng.uniform(220.0, 800.0)
+                rul_hrs = max(1.0, rul_base + eps_rul)
 
             rows.append({
                 "machine_id": mid,
