@@ -52,8 +52,9 @@ def render_whatif_view(simulator, db):
             st.info("The factory starts with all 6 industrial workstations operating within nominal, healthy limits (Health > 95%, Failure Risk < 2%).")
             if st.button("▶️ Reset Factory to All Normal States", use_container_width=True):
                 db.reset_to_defaults()
-                simulator.perform_maintenance("M1-CNC-01")
-                simulator.perform_maintenance("M2-CNC-02")
+                simulator.reset()
+                st.session_state.pop("last_optimization_result", None)
+                st.session_state.pop("guided_opt_result", None)
                 st.success("Factory baseline restored! All machines operating nominally.")
                 st.rerun()
             

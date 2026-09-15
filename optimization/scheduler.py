@@ -32,6 +32,15 @@ class ProductionScheduler:
         """Filters machines capable of executing the requested machine type."""
         return [m for m in machines_list if m["type"] == machine_type]
 
+    @staticmethod
+    def is_machine_high_risk(m_info: Dict[str, Any]) -> bool:
+        """Standardized check: returns True if machine is degraded, failing, or high failure probability (BUG-14)."""
+        return (
+            m_info.get("failure_prob", 0.0) > 0.35
+            or m_info.get("health_score", 100.0) < 60.0
+            or m_info.get("status") in (STATUS_CRITICAL, STATUS_FAILED)
+        )
+
     def build_naive_baseline_schedule(
         self,
         orders: List[Dict[str, Any]],
@@ -42,6 +51,8 @@ class ProductionScheduler:
         ignoring machine health, failure risk, and energy costs).
         Used for Before vs. After comparison.
         """
+        # Exclude completed orders from baseline scheduling (BUG-12)
+        orders = [o for o in orders if o.get("status") != "Completed"]
         machine_lookup = {m["machine_id"]: m for m in machines}
         machine_timelines: Dict[str, float] = {m["machine_id"]: 0.0 for m in machines}
         
@@ -81,8 +92,8 @@ class ProductionScheduler:
             tardiness = max(0.0, end_time - deadline)
             total_tardiness += tardiness * PRIORITY_WEIGHTS.get(order["priority"], 2)
 
-            # Check if machine was high risk
-            if m_info["failure_prob"] > 0.35 or m_info["health_score"] < 60.0 or m_info["status"] in (STATUS_CRITICAL, STATUS_FAILED):
+            # Check if machine was high risk (BUG-14)
+            if self.is_machine_high_risk(m_info):
                 high_risk_assignments += 1
 
             # Energy calculation
@@ -144,6 +155,8 @@ class ProductionScheduler:
         t0 = time.time()
         if orders is None:
             orders = self.db.get_orders()
+        # Exclude completed orders from CP-SAT optimization (BUG-12)
+        orders = [o for o in orders if o.get("status") != "Completed"]
         if machines is None:
             machines = self.db.get_machines()
 
@@ -306,7 +319,8 @@ class ProductionScheduler:
                 tardiness = max(0.0, end_hrs - deadline)
                 opt_total_tardiness += tardiness * PRIORITY_WEIGHTS.get(order["priority"], 2)
 
-                if m_info["failure_prob"] > 0.35 or m_info["health_score"] < 60.0:
+                # Check if machine was high risk (BUG-14)
+                if self.is_machine_high_risk(m_info):
                     opt_high_risk_count += 1
 
                 # Predict Energy

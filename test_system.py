@@ -118,43 +118,47 @@ class TestSmartFactorySystem(unittest.TestCase):
 
     def test_06_order_progression(self):
         """BUG-01: Verify step() decrements order processing time and completes finished jobs."""
-        # Ensure fresh state for test order
         test_oid = "ORD-TEST-PROG"
-        with self.db.get_connection() as conn:
-            conn.execute("DELETE FROM production_orders WHERE order_id = ?", (test_oid,))
-            conn.commit()
+        try:
+            with self.db.get_connection() as conn:
+                conn.execute("DELETE FROM production_orders WHERE order_id = ?", (test_oid,))
+                conn.commit()
 
-        self.db.add_order(
-            order_id=test_oid,
-            product_code="PRD-AERO-01",
-            product_name="Test Turbine Blade",
-            quantity=10,
-            processing_time_hrs=1.0,
-            required_machine_type="CNC_MILL",
-            priority="High",
-            deadline_hrs=12.0
-        )
-        self.db.update_order_assignment(
-            order_id=test_oid,
-            machine_id="M1-CNC-01",
-            start_hrs=0.0,
-            end_hrs=1.0,
-            delay_risk=0.05,
-            is_delayed=0,
-            energy_kwh=25.0
-        )
-        # Advance by 0.5 hours
-        self.simulator.step(time_delta_hrs=0.5)
-        orders = {o["order_id"]: o for o in self.db.get_orders()}
-        self.assertEqual(orders[test_oid]["status"], "In-Progress")
-        self.assertAlmostEqual(orders[test_oid]["processing_time_hrs"], 0.5, places=2)
+            self.db.add_order(
+                order_id=test_oid,
+                product_code="PRD-AERO-01",
+                product_name="Test Turbine Blade",
+                quantity=10,
+                processing_time_hrs=1.0,
+                required_machine_type="CNC_MILL",
+                priority="High",
+                deadline_hrs=12.0
+            )
+            self.db.update_order_assignment(
+                order_id=test_oid,
+                machine_id="M1-CNC-01",
+                start_hrs=0.0,
+                end_hrs=1.0,
+                delay_risk=0.05,
+                is_delayed=0,
+                energy_kwh=25.0
+            )
+            # Advance by 0.5 hours
+            self.simulator.step(time_delta_hrs=0.5)
+            orders = {o["order_id"]: o for o in self.db.get_orders()}
+            self.assertEqual(orders[test_oid]["status"], "In-Progress")
+            self.assertAlmostEqual(orders[test_oid]["processing_time_hrs"], 0.5, places=2)
 
-        # Advance by 0.6 hours -> should complete
-        self.simulator.step(time_delta_hrs=0.6)
-        orders = {o["order_id"]: o for o in self.db.get_orders()}
-        self.assertEqual(orders[test_oid]["status"], "Completed")
-        self.assertAlmostEqual(orders[test_oid]["processing_time_hrs"], 0.0, places=2)
-        print(f" [PASS] BUG-01: Order progression advanced and transitioned to Completed correctly.")
+            # Advance by 0.6 hours -> should complete
+            self.simulator.step(time_delta_hrs=0.6)
+            orders = {o["order_id"]: o for o in self.db.get_orders()}
+            self.assertEqual(orders[test_oid]["status"], "Completed")
+            self.assertAlmostEqual(orders[test_oid]["processing_time_hrs"], 0.0, places=2)
+            print(f" [PASS] BUG-01: Order progression advanced and transitioned to Completed correctly.")
+        finally:
+            with self.db.get_connection() as conn:
+                conn.execute("DELETE FROM production_orders WHERE order_id = ?", (test_oid,))
+                conn.commit()
 
     def test_07_energy_continuous_peak_overlap(self):
         """BUG-02: Verify continuous interval overlap calculus in peak tariff calculation."""
@@ -206,8 +210,8 @@ class TestSmartFactorySystem(unittest.TestCase):
             # Optimizer should still assign all orders (including CNC orders with heavy penalty) without dropping any
             res = self.scheduler.optimize_schedule(max_solve_time_sec=4.0, commit_to_db=False)
             self.assertIn(res["solver_status"], ["OPTIMAL", "FEASIBLE"])
-            # Verify order count matches
-            orders = self.db.get_orders()
+            # Verify order count matches active orders (excluding completed)
+            orders = [o for o in self.db.get_orders() if o.get("status") != "Completed"]
             self.assertEqual(len(res["optimized"]["scheduled_orders"]), len(orders), "No orders should be dropped")
             print(f" [PASS] BUG-04: Optimizer handled all-failed cell with 0 orders dropped ({len(res['optimized']['scheduled_orders'])} orders scheduled).")
         finally:
@@ -289,6 +293,86 @@ class TestSmartFactorySystem(unittest.TestCase):
             self.assertEqual(len(dep_warnings), 0, "No deprecation warnings should be emitted on model loading")
             print(" [PASS] BUG-10: PdM model loads cleanly with 0 deprecation warnings.")
 
+    def test_14_bug11_machine_concurrency(self):
+        """BUG-11: Verify machine concurrency enforcement prevents parallel execution on single machine."""
+        oid1 = "ORD-TEST-C1"
+        oid2 = "ORD-TEST-C2"
+        target_mid = "M6-INJ-02"
+        try:
+            # Temporarily unassign any prior orders from target machine for clean test isolation
+            with self.db.get_connection() as conn:
+                conn.execute("UPDATE production_orders SET assigned_machine_id = NULL WHERE assigned_machine_id = ?", (target_mid,))
+                conn.commit()
+
+            self.db.add_order(oid1, "PRD-POLY-03", "Polymer 1", 5, 2.0, "INJECTION_MOLD", "High", 20.0)
+            self.db.add_order(oid2, "PRD-POLY-03", "Polymer 2", 5, 2.0, "INJECTION_MOLD", "Medium", 25.0)
+            self.db.update_order_assignment(oid1, target_mid, 0.0, 2.0, 0.05, 0, 40.0)
+            self.db.update_order_assignment(oid2, target_mid, 2.0, 4.0, 0.05, 0, 40.0)
+
+            # Advance by 1.0 hour
+            self.simulator.step(time_delta_hrs=1.0)
+            orders = {o["order_id"]: o for o in self.db.get_orders()}
+
+            # Job 1 must have progressed to In-Progress with 1.0 hr left
+            self.assertEqual(orders[oid1]["status"], "In-Progress")
+            self.assertAlmostEqual(orders[oid1]["processing_time_hrs"], 1.0, places=2)
+
+            # Job 2 must remain Scheduled with full 2.0 hrs (NOT progressed concurrently!)
+            self.assertEqual(orders[oid2]["status"], "Scheduled")
+            self.assertAlmostEqual(orders[oid2]["processing_time_hrs"], 2.0, places=2)
+            print(" [PASS] BUG-11: Single-machine concurrency strictly enforced (Job 2 queued while Job 1 runs).")
+        finally:
+            with self.db.get_connection() as conn:
+                conn.execute("DELETE FROM production_orders WHERE order_id IN (?, ?)", (oid1, oid2))
+                conn.commit()
+
+    def test_15_bug12_completed_orders_excluded(self):
+        """BUG-12: Verify completed orders with 0 duration are excluded from optimization."""
+        oid_done = "ORD-TEST-DONE"
+        try:
+            self.db.add_order(oid_done, "PRD-AUTO-02", "Done Chassis", 10, 0.0, "ROBOTIC_ARM", "Low", 5.0)
+            self.db.update_order_status(oid_done, "Completed")
+
+            res = self.scheduler.optimize_schedule(max_solve_time_sec=2.0, commit_to_db=False)
+            base_ids = [o["order_id"] for o in res["baseline"]["scheduled_orders"]]
+            opt_ids = [o["order_id"] for o in res["optimized"]["scheduled_orders"]]
+
+            self.assertNotIn(oid_done, base_ids, "Completed orders must not appear in baseline schedule")
+            self.assertNotIn(oid_done, opt_ids, "Completed orders must not appear in optimized schedule")
+            print(" [PASS] BUG-12: Completed orders cleanly excluded from CP-SAT optimization.")
+        finally:
+            with self.db.get_connection() as conn:
+                conn.execute("DELETE FROM production_orders WHERE order_id = ?", (oid_done,))
+                conn.commit()
+
+    def test_16_bug13_whatif_reset_state(self):
+        """BUG-13: Verify simulator reset restores clock to 0.0 and purges anomaly states."""
+        self.simulator.simulation_time_hrs = 14.5
+        self.simulator.inject_anomaly("M1-CNC-01", "COOLANT_FAILURE")
+        self.assertTrue(self.simulator.anomaly_states["M1-CNC-01"]["active"])
+        self.assertGreater(self.simulator.simulation_time_hrs, 0.0)
+
+        self.simulator.reset()
+        self.assertEqual(self.simulator.simulation_time_hrs, 0.0)
+        self.assertFalse(self.simulator.anomaly_states["M1-CNC-01"]["active"])
+        print(" [PASS] BUG-13: Simulator reset cleanly restores clock to 0.0 and clears anomaly buffers.")
+
+    def test_17_bug14_risk_metric_consistency(self):
+        """BUG-14: Verify is_machine_high_risk accurately flags critical/failed/degraded status."""
+        healthy_m = {"status": "NORMAL", "failure_prob": 0.02, "health_score": 98.0}
+        critical_m = {"status": "CRITICAL", "failure_prob": 0.20, "health_score": 75.0}
+        failed_m = {"status": "FAILED", "failure_prob": 0.10, "health_score": 80.0}
+        prob_m = {"status": "NORMAL", "failure_prob": 0.45, "health_score": 85.0}
+        health_m = {"status": "NORMAL", "failure_prob": 0.15, "health_score": 55.0}
+
+        self.assertFalse(self.scheduler.is_machine_high_risk(healthy_m))
+        self.assertTrue(self.scheduler.is_machine_high_risk(critical_m))
+        self.assertTrue(self.scheduler.is_machine_high_risk(failed_m))
+        self.assertTrue(self.scheduler.is_machine_high_risk(prob_m))
+        self.assertTrue(self.scheduler.is_machine_high_risk(health_m))
+        print(" [PASS] BUG-14: Machine risk evaluation standardized across baseline and CP-SAT.")
+
 
 if __name__ == "__main__":
     unittest.main()
+

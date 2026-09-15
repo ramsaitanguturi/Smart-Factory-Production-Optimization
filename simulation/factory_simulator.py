@@ -190,31 +190,57 @@ class FactorySimulator:
         if telemetry_batch:
             self.db.record_telemetry_batch(telemetry_batch)
 
-        # Advance in-flight production orders (BUG-01)
+        # Advance in-flight production orders with single-machine concurrency enforcement (BUG-01 & BUG-11)
         active_orders = self.db.get_orders(status="Scheduled") + self.db.get_orders(status="In-Progress")
+        
+        # Group orders by assigned machine
+        orders_by_machine: Dict[str, List[Dict[str, Any]]] = {}
         for order in active_orders:
             assigned_mid = order.get("assigned_machine_id")
-            if not assigned_mid:
-                continue
+            if assigned_mid:
+                orders_by_machine.setdefault(assigned_mid, []).append(order)
+
+        for assigned_mid, m_orders in orders_by_machine.items():
             m_info = self.db.get_machine(assigned_mid)
             # Only advance execution if assigned machine is operational
-            if m_info and m_info["status"] in (STATUS_NORMAL, STATUS_WARNING):
-                rem_time = max(0.0, float(order["processing_time_hrs"]) - time_delta_hrs)
-                if rem_time <= 0.001:
-                    self.db.update_order_status(order["order_id"], "Completed")
-                    with self.db.get_connection() as conn:
-                        conn.execute("UPDATE production_orders SET processing_time_hrs = 0.0 WHERE order_id = ?",
-                                     (order["order_id"],))
-                        conn.execute("UPDATE machines SET total_cycles = total_cycles + 1 WHERE machine_id = ?",
-                                     (assigned_mid,))
-                        conn.commit()
-                else:
-                    with self.db.get_connection() as conn:
-                        conn.execute(
-                            "UPDATE production_orders SET processing_time_hrs = ?, status = 'In-Progress' WHERE order_id = ?",
-                            (round(rem_time, 2), order["order_id"])
-                        )
-                        conn.commit()
+            if not m_info or m_info["status"] not in (STATUS_NORMAL, STATUS_WARNING):
+                continue
+
+            # Prioritize order already In-Progress on this machine
+            in_prog = [o for o in m_orders if o["status"] == "In-Progress"]
+            if in_prog:
+                in_prog.sort(key=lambda o: float(o.get("scheduled_start_hrs", 0.0)))
+                current_order = in_prog[0]
+            else:
+                # Find scheduled order whose start time has arrived, or earliest scheduled order in queue
+                sched = [o for o in m_orders if o["status"] == "Scheduled"]
+                sched.sort(key=lambda o: (float(o.get("scheduled_start_hrs", 0.0)), float(o.get("deadline_hrs", 999.0))))
+                eligible = [o for o in sched if float(o.get("scheduled_start_hrs", 0.0)) <= self.simulation_time_hrs]
+                current_order = eligible[0] if eligible else sched[0] if sched else None
+
+            if not current_order:
+                continue
+
+            rem_time = max(0.0, float(current_order["processing_time_hrs"]) - time_delta_hrs)
+            if rem_time <= 0.001:
+                self.db.update_order_status(current_order["order_id"], "Completed")
+                with self.db.get_connection() as conn:
+                    conn.execute(
+                        "UPDATE production_orders SET processing_time_hrs = 0.0 WHERE order_id = ?",
+                        (current_order["order_id"],)
+                    )
+                    conn.execute(
+                        "UPDATE machines SET total_cycles = total_cycles + 1 WHERE machine_id = ?",
+                        (assigned_mid,)
+                    )
+                    conn.commit()
+            else:
+                with self.db.get_connection() as conn:
+                    conn.execute(
+                        "UPDATE production_orders SET processing_time_hrs = ?, status = 'In-Progress' WHERE order_id = ?",
+                        (round(rem_time, 2), current_order["order_id"])
+                    )
+                    conn.commit()
 
         return {
             "simulation_time_hrs": round(self.simulation_time_hrs, 2),
