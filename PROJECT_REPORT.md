@@ -86,7 +86,7 @@ The architecture is built on a decoupled, five-tier structure ensuring clean sep
 graph TD
     subgraph S1["1. Physics & Simulation Layer"]
         GEN[TelemetryGenerator<br/>Physics Equations & Degradation Curves] --> SIM[FactorySimulator<br/>Shop Floor State Machine]
-        SIM -->|Anomaly Injection| S1
+        ANOM[What-If Fault Injection<br/>Coolant, Bearing, Motor Anomaly] -->|Inject Degradation| SIM
     end
 
     subgraph S2["2. Persistence Layer"]
@@ -260,7 +260,8 @@ erDiagram
 
 The failure classifier is trained on $8,000$ synthetic operating records reflecting multi-sensor degradation states:
 - **Feature Vector ($X \in \mathbb{R}^7$)**:
-  $$X = [\text{temperature}, \text{vibration}, \text{rpm}, \text{pressure}, \text{power\_kw}, \text{operating\_hours}, \text{load\_factor}]$$
+  $$X = [\text{Temperature}, \text{Vibration}, \text{RPM}, \text{Pressure}, \text{Power}, \text{Operating Hours}, \text{Load Factor}]$$
+  *Feature columns in dataset: `['temperature', 'vibration', 'rpm', 'pressure', 'power_kw', 'operating_hours', 'load_factor']`.*
 - **Target Label ($y \in \{0, 1\}$)**: $1$ if the machine meets physical failure criteria, $0$ otherwise.
 - **Model Parameters**: `XGBClassifier(n_estimators=140, max_depth=5, learning_rate=0.07, subsample=0.85, colsample_bytree=0.85, eval_metric="logloss")`
 

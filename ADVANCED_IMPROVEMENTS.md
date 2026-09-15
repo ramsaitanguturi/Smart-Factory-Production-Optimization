@@ -133,7 +133,7 @@ The current scheduler assumes static batch scheduling starting at $t=0$. The adv
 ### 3.2 Multi-Objective Pareto Frontier Exploration (NSGA-II)
 Rather than condensing objectives into a static linear weighting, generate the full **Pareto Optimal Frontier**:
 
-$$\min \mathbf{F}(\mathbf{x}) = \begin{bmatrix} f_1(\mathbf{x}): \text{Total Weighted Tardiness} \\ f_2(\mathbf{x}): \text{Failure Risk Exposure} \\ f_3(\mathbf{x}): \text{Energy & Tariff Cost} \\ f_4(\mathbf{x}): \text{Total Schedule Makespan} \end{bmatrix}$$
+$$\min \mathbf{F}(\mathbf{x}) = \begin{bmatrix} f_1(\mathbf{x}): \text{Total Weighted Tardiness} \\ f_2(\mathbf{x}): \text{Failure Risk Exposure} \\ f_3(\mathbf{x}): \text{Energy and Tariff Cost} \\ f_4(\mathbf{x}): \text{Total Schedule Makespan} \end{bmatrix}$$
 
 - Operators use an interactive 3D slider to balance trade-offs:
   - **"Maximum Speed Mode"**: Minimizes tardiness at the expense of running healthy machines at higher power during peak tariff windows.
