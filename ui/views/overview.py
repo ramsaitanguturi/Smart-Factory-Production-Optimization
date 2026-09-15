@@ -124,15 +124,20 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
     </div>
     """, unsafe_allow_html=True)
     
-    target_machine_ids = [m["machine_id"] for m in machines] if machines else ["M1-CNC-01"]
-    anom_options = {
-        "COOLANT_FAILURE": "🔥 Heat / Coolant Failure",
-        "BEARING_WEAR": "⚡ Bearing Harmonic Wear",
-        "MOTOR_MISALIGN": "⚙️ Motor Misalignment",
-        "CATASTROPHIC_FAILURE": "💥 Sudden Breakdown"
-    }
+    # Display persistent action feedback if set
+    if "overview_feedback" in st.session_state and st.session_state["overview_feedback"]:
+        fb_type, fb_msg = st.session_state.pop("overview_feedback")
+        if fb_type == "warning":
+            st.warning(fb_msg)
+        elif fb_type == "success":
+            st.success(fb_msg)
+        elif fb_type == "error":
+            st.error(fb_msg)
 
-    ctl_c1, ctl_c2, ctl_c3, ctl_c4 = st.columns([1.4, 1.3, 1.8, 2.0])
+    target_machine_ids = [m["machine_id"] for m in machines] if machines else ["M1-CNC-01"]
+    short_map = {mid: mid.split("-")[0] for mid in target_machine_ids}
+
+    ctl_c1, ctl_c2, ctl_c3, ctl_c4 = st.columns([1.4, 1.4, 2.0, 2.0])
     with ctl_c1:
         if st.button("⏩ Step (+0.5h)", use_container_width=True, help="Advance simulation time by 30 minutes"):
             simulator.step(time_delta_hrs=0.5)
@@ -143,36 +148,69 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
             st.rerun()
     with ctl_c3:
         selected_mid = st.selectbox(
-            "Target Machine",
+            "Target Workstation",
             options=target_machine_ids,
+            format_func=lambda x: f"🎯 Machine: {x}",
             index=0,
             key="overview_ctrl_target_machine",
-            label_visibility="collapsed",
-            help="Select target workstation"
+            label_visibility="collapsed"
         )
     with ctl_c4:
-        selected_anom = st.selectbox(
-            "Anomaly Type",
-            options=list(anom_options.keys()),
-            format_func=lambda k: anom_options[k],
-            index=0,
-            key="overview_ctrl_anom_type",
-            label_visibility="collapsed",
-            help="Select anomaly pattern to simulate"
-        )
-
-    act_c1, act_c2 = st.columns([1, 1])
-    short_id = selected_mid.split("-")[0] if "-" in selected_mid else selected_mid
-    anom_tag = anom_options.get(selected_anom, "Anomaly").split(" ")[1]
-    with act_c1:
-        if st.button(f"⚠️ Simulate {anom_tag} Anomaly on {short_id} ({selected_mid})", use_container_width=True):
-            simulator.inject_anomaly(selected_mid, selected_anom)
-            st.warning(f"Injected {anom_options[selected_anom]} on {selected_mid}! Sensor telemetry will spike.")
-            st.rerun()
-    with act_c2:
-        if st.button(f"🛠️ Perform Maintenance on {short_id} ({selected_mid})", use_container_width=True):
+        short_id = short_map.get(selected_mid, selected_mid)
+        if st.button(f"🛠️ Restore {short_id} ({selected_mid})", use_container_width=True, help=f"Clear active anomalies & restore {selected_mid} to healthy status"):
             simulator.perform_maintenance(selected_mid)
-            st.success(f"Maintenance performed! {selected_mid} restored to healthy status.")
+            msg = f"🛠️ Maintenance performed! {selected_mid} restored to healthy status (98.5% health)."
+            st.session_state["overview_feedback"] = ("success", msg)
+            try:
+                st.toast(msg, icon="🛠️")
+            except Exception:
+                pass
+            st.rerun()
+
+    muted_clr = pal["text_muted"]
+    blue_clr = pal["accent_blue"]
+    st.markdown(f"<div style='font-size: 0.78rem; color: {muted_clr}; margin: 8px 0 4px 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;'>⚡ 1-Click Anomaly Injections for <span style='color: {blue_clr};'>{selected_mid}</span>:</div>", unsafe_allow_html=True)
+
+    anom_c1, anom_c2, anom_c3, anom_c4 = st.columns(4)
+    with anom_c1:
+        if st.button("🔥 Heat / Coolant Spike", use_container_width=True, help=f"Inject rapid overheating and pressure loss on {selected_mid}"):
+            simulator.inject_anomaly(selected_mid, "COOLANT_FAILURE")
+            msg = f"🔥 Injected Coolant Failure anomaly on {selected_mid}! Temperature & pressure spiking."
+            st.session_state["overview_feedback"] = ("warning", msg)
+            try:
+                st.toast(msg, icon="🔥")
+            except Exception:
+                pass
+            st.rerun()
+    with anom_c2:
+        if st.button("⚡ Bearing Harmonic Wear", use_container_width=True, help=f"Inject severe vibration surge on {selected_mid}"):
+            simulator.inject_anomaly(selected_mid, "BEARING_WEAR")
+            msg = f"⚡ Injected Bearing Wear anomaly on {selected_mid}! Vibration surging."
+            st.session_state["overview_feedback"] = ("warning", msg)
+            try:
+                st.toast(msg, icon="⚡")
+            except Exception:
+                pass
+            st.rerun()
+    with anom_c3:
+        if st.button("⚙️ Motor Misalignment", use_container_width=True, help=f"Inject RPM fluctuation & erratic current on {selected_mid}"):
+            simulator.inject_anomaly(selected_mid, "MOTOR_MISALIGN")
+            msg = f"⚙️ Injected Motor Misalignment on {selected_mid}! RPM and power fluctuating."
+            st.session_state["overview_feedback"] = ("warning", msg)
+            try:
+                st.toast(msg, icon="⚙️")
+            except Exception:
+                pass
+            st.rerun()
+    with anom_c4:
+        if st.button("💥 Sudden Breakdown", use_container_width=True, help=f"Trigger critical emergency breakdown on {selected_mid}"):
+            simulator.inject_anomaly(selected_mid, "CATASTROPHIC_FAILURE")
+            msg = f"💥 Injected Catastrophic Breakdown on {selected_mid}! Machine halted."
+            st.session_state["overview_feedback"] = ("error", msg)
+            try:
+                st.toast(msg, icon="💥")
+            except Exception:
+                pass
             st.rerun()
 
     # Recent Telemetry Log Table
