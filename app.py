@@ -160,7 +160,7 @@ def main():
     elif nav_choice == "🛠️ Predictive Maintenance":
         render_maintenance_view(simulator, db, theme=current_theme)
     elif nav_choice == "📋 Production Orders Queue":
-        render_production_view(simulator, db)
+        render_production_view(simulator, db, theme=current_theme)
     elif nav_choice == "⚡ Energy & Power Analytics":
         render_energy_view(simulator, db, theme=current_theme)
     elif nav_choice == "🧠 AI Production Optimizer":

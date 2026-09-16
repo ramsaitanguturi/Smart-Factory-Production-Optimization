@@ -705,6 +705,37 @@ Re-training with physically coupled RUL raises Random Forest evaluation to $R^2 
 
 ---
 
+## BUG-16 [CRITICAL]: `NameError: name 'status_badge' is not defined` in Production View
+
+### 1. Affected Component
+- **Files**: `ui/views/production.py` (lines 38–66)
+
+### 2. Root Cause Analysis
+During a previous refactor updating order statuses to use emoji prefixes (`display_status`), the block computing `status_badge` was accidentally deleted while the dictionary key `"Schedule Risk": status_badge` remained in `table_rows.append({...})`. When operators opened the **Production Orders Queue & Delay Risk Management** tab, the view immediately crashed with:
+```
+NameError: name 'status_badge' is not defined
+  File "ui/views/production.py", line 63, in render_production_view
+    "Schedule Risk": status_badge,
+```
+
+### 3. Solution & Code Fix
+1. Extracted table generation into a pure helper `build_orders_table(filtered_orders)`.
+2. Restored and improved schedule risk logic:
+```python
+if status_val == "Completed":
+    status_badge = "⚠️ LATE" if is_del else "✅ ON TIME"
+elif is_del:
+    status_badge = "⚠️ LATE"
+elif delay_risk > 0.50:
+    status_badge = "⚠️ AT RISK"
+else:
+    status_badge = "✅ ON TIME"
+```
+3. Ensured deterministic ordering in the status filter multiselect and added real-time KPI metrics (Total Shown, In-Progress, Delayed) in filter column 3.
+4. Added unit test `test_21_production_order_table_rendering` to `test_system.py`.
+
+---
+
 ### Verification and Testing Summary
 
 Executing the fixes described above achieves the following results:
@@ -713,5 +744,7 @@ Executing the fixes described above achieves the following results:
 3. **Robust Database & Persistence (BUG-03 & BUG-08)**: Foreign keys strictly enforced, batch writes execute in a single ACID transaction, and order IDs are generated collision-free.
 4. **Resilient Optimization & Clean Lifecycle (BUG-04, BUG-12, BUG-14)**: Solver handles all-failed cells with 0 dropped orders, completed orders are never rescheduled with zero duration, and machine risk evaluation is 100% symmetric.
 5. **Synchronized Digital Twin State (BUG-05 & BUG-13)**: Reset cleanly restores simulation clock to $T=0.0\text{h}$, purges all anomaly buffers, and clears stale UI caches across all views.
-6. **Automated Test Coverage**: Full test suite in `test_system.py` expanded to **17 automated unit tests** with a **100% pass rate**.
+6. **Queue Table & Delay Risk Stability (BUG-16)**: Production orders queue renders without runtime exceptions; schedule risk badges dynamically show `⚠️ LATE`, `⚠️ AT RISK`, or `✅ ON TIME`.
+7. **Automated Test Coverage**: Full test suite in `test_system.py` expanded to **21 automated unit tests** with a **100% pass rate**.
+
 

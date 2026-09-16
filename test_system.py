@@ -446,7 +446,86 @@ class TestSmartFactorySystem(unittest.TestCase):
         self.assertEqual(light_gantt.layout.paper_bgcolor, "#ffffff")
         print(" [PASS] THEME-02: Plotly charts dynamic theme adaptation verified.")
 
+    def test_21_production_order_table_rendering(self):
+        """Verify production queue table rendering and schedule risk badges."""
+        from ui.views.production import build_orders_table
+
+        mock_orders = [
+            {
+                "order_id": "ORD-TEST-01",
+                "product_name": "Turbine Blade",
+                "quantity": 10,
+                "required_machine_type": "CNC_MILL",
+                "priority": "High",
+                "processing_time_hrs": 2.5,
+                "scheduled_start_hrs": 1.0,
+                "deadline_hrs": 12.0,
+                "assigned_machine_id": "M1-CNC-01",
+                "status": "In-Progress",
+                "delay_risk_prob": 0.15,
+                "is_delayed": 0,
+                "energy_kwh_predicted": 15.0
+            },
+            {
+                "order_id": "ORD-TEST-02",
+                "product_name": "Hydraulic Pump",
+                "quantity": 5,
+                "required_machine_type": "ROBOTIC_WELDER",
+                "priority": "Urgent",
+                "processing_time_hrs": 4.0,
+                "scheduled_start_hrs": 3.0,
+                "deadline_hrs": 5.0,
+                "assigned_machine_id": "M3-ROB-01",
+                "status": "Scheduled",
+                "delay_risk_prob": 0.85,
+                "is_delayed": 0,
+                "energy_kwh_predicted": 22.0
+            },
+            {
+                "order_id": "ORD-TEST-03",
+                "product_name": "Stamping Bracket",
+                "quantity": 20,
+                "required_machine_type": "HYDRAULIC_PRESS",
+                "priority": "Medium",
+                "processing_time_hrs": 1.0,
+                "scheduled_start_hrs": 0.0,
+                "deadline_hrs": 2.0,
+                "assigned_machine_id": "M5-PRS-01",
+                "status": "In-Progress",
+                "delay_risk_prob": 1.0,
+                "is_delayed": 1,
+                "energy_kwh_predicted": 10.0
+            },
+            {
+                "order_id": "ORD-TEST-04",
+                "product_name": "Turbine Blade",
+                "quantity": 15,
+                "required_machine_type": "CNC_MILL",
+                "priority": "Low",
+                "processing_time_hrs": 0.0,
+                "scheduled_start_hrs": 0.0,
+                "deadline_hrs": 8.0,
+                "assigned_machine_id": "M1-CNC-01",
+                "status": "Completed",
+                "delay_risk_prob": 0.0,
+                "is_delayed": 0,
+                "energy_kwh_predicted": 12.0
+            }
+        ]
+
+        df = build_orders_table(mock_orders)
+        self.assertEqual(len(df), 4)
+        self.assertIn("Schedule Risk", df.columns)
+        self.assertIn("Delay Risk (%)", df.columns)
+        self.assertEqual(df.loc[df["Order ID"] == "ORD-TEST-01", "Schedule Risk"].values[0], "✅ ON TIME")
+        self.assertEqual(df.loc[df["Order ID"] == "ORD-TEST-02", "Schedule Risk"].values[0], "⚠️ AT RISK")
+        self.assertEqual(df.loc[df["Order ID"] == "ORD-TEST-03", "Schedule Risk"].values[0], "⚠️ LATE")
+        self.assertEqual(df.loc[df["Order ID"] == "ORD-TEST-04", "Schedule Risk"].values[0], "✅ ON TIME")
+        self.assertEqual(df.loc[df["Order ID"] == "ORD-TEST-04", "Status"].values[0], "✅ Completed")
+        print(" [PASS] BUG-FIX: Production order table rendering and risk badges verified.")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
