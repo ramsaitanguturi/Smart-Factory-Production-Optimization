@@ -180,13 +180,17 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
     with tab_sandbox:
         st.markdown("##### 🎛️ Inject Custom Scenarios and Evaluate Factory Resilience")
         
-        sb_col1, sb_col2 = st.columns(2)
-        with sb_col1:
-            st.markdown("###### 1. Machine Degradation Scenarios")
-            machines = db.get_machines()
-            m_select = st.selectbox("Target Machine:", [m["machine_id"] for m in machines], key="sb_target_m")
+        # Section 1: Machine Degradation Scenarios
+        with st.container(border=True):
+            st.markdown("###### 💥 1. Machine Degradation Scenarios")
+            c_sel, c_desc = st.columns([1, 3], vertical_alignment="center")
+            with c_sel:
+                machines = db.get_machines()
+                m_select = st.selectbox("Target Machine:", [m["machine_id"] for m in machines], key="sb_target_m")
+            with c_desc:
+                st.caption(f"Inject real-time physical degradation or execute emergency maintenance on workstation **{m_select}**.")
             
-            sc1, sc2 = st.columns(2)
+            sc1, sc2, sc3, sc4 = st.columns(4)
             with sc1:
                 if st.button(f"🔥 Coolant Loss on {m_select}", use_container_width=True):
                     simulator.inject_anomaly(m_select, "COOLANT_FAILURE")
@@ -197,8 +201,6 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
                     simulator.inject_anomaly(m_select, "BEARING_WEAR")
                     st.warning(f"Injected Bearing Wear on {m_select}")
                     st.rerun()
-            
-            sc3, sc4 = st.columns(2)
             with sc3:
                 if st.button(f"💥 Sudden Breakdown on {m_select}", use_container_width=True):
                     simulator.inject_anomaly(m_select, "CATASTROPHIC_FAILURE")
@@ -210,20 +212,27 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
                     st.success(f"Restored {m_select} to healthy state")
                     st.rerun()
 
-        with sb_col2:
-            st.markdown("###### 2. Production & Market Demand Scenarios")
-            if st.button("📦 Surge Rush Customer Orders (+3 Urgent Orders)", use_container_width=True):
-                simulator.inject_rush_orders(count=3)
-                st.warning("Injected 3 urgent high-priority production orders into the queue!")
-                st.rerun()
+        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
 
-            if st.button("⚡ Simulate Peak Energy Tariff Window (14:00 - 19:00)", use_container_width=True):
-                st.info("Peak energy tariff ($0.28/kWh) active. Optimization will shift heavy jobs out of peak hours.")
-
-            if st.button("🔄 Reset Entire Factory & Database to Pristine State", use_container_width=True):
-                db.reset_to_defaults()
-                simulator.reset()
-                st.session_state.pop("last_optimization_result", None)
-                st.session_state.pop("guided_opt_result", None)
-                st.success("Factory state reset to defaults.")
-                st.rerun()
+        # Section 2: Production & Market Demand Scenarios
+        with st.container(border=True):
+            st.markdown("###### 🏭 2. Production & Market Demand Scenarios")
+            st.caption("Simulate macroeconomic disturbances, dynamic customer order rushes, and electricity tariff shifts.")
+            
+            dc1, dc2, dc3 = st.columns(3)
+            with dc1:
+                if st.button("📦 Surge Rush Customer Orders (+3 Urgent Orders)", use_container_width=True):
+                    simulator.inject_rush_orders(count=3)
+                    st.warning("Injected 3 urgent high-priority production orders into the queue!")
+                    st.rerun()
+            with dc2:
+                if st.button("⚡ Simulate Peak Energy Tariff Window (14:00 - 19:00)", use_container_width=True):
+                    st.info("Peak energy tariff ($0.28/kWh) active. Optimization will shift heavy jobs out of peak hours.")
+            with dc3:
+                if st.button("🔄 Reset Entire Factory & Database to Pristine State", use_container_width=True):
+                    db.reset_to_defaults()
+                    simulator.reset()
+                    st.session_state.pop("last_optimization_result", None)
+                    st.session_state.pop("guided_opt_result", None)
+                    st.success("Factory state reset to defaults.")
+                    st.rerun()

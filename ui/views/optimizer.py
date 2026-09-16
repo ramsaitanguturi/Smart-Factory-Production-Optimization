@@ -30,7 +30,7 @@ def render_optimizer_view(simulator, db, theme: Optional[str] = None):
     - **Objective 3**: Minimize Total Factory Energy Consumption and Avoid Peak Load Spikes
     """)
 
-    opt_col1, opt_col2, opt_col3 = st.columns([2, 2, 2])
+    opt_col1, opt_col2, opt_col3 = st.columns([2, 2, 2], vertical_alignment="bottom")
     with opt_col1:
         time_limit = st.slider("Solver Time Limit (seconds):", min_value=1.0, max_value=10.0, value=3.0, step=1.0)
     with opt_col2:

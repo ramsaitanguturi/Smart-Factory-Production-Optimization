@@ -107,19 +107,27 @@ def render_production_view(simulator, db, theme: Optional[str] = None):
     """, unsafe_allow_html=True)
 
     with st.form("new_order_form"):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            prod_names = {p["code"]: f"{p['name']} ({p['machine_type']})" for p in PRODUCTS}
+        prod_names = {p["code"]: f"{p['name']} ({p['machine_type']})" for p in PRODUCTS}
+
+        # Row 1: Product Selection, Processing Time, Delivery Deadline
+        r1_c1, r1_c2, r1_c3 = st.columns(3)
+        with r1_c1:
             selected_pcode = st.selectbox("Product Catalog", options=list(prod_names.keys()), format_func=lambda x: prod_names[x])
-            qty = st.number_input("Batch Quantity (Units)", min_value=1, max_value=500, value=25, step=5)
-        with c2:
-            p_obj = next(p for p in PRODUCTS if p["code"] == selected_pcode)
+        p_obj = next(p for p in PRODUCTS if p["code"] == selected_pcode)
+        with r1_c2:
             proc_time = st.number_input("Required Processing Time (hrs)", min_value=0.5, max_value=24.0, value=float(p_obj["base_time_hrs"]), step=0.5)
-            prio = st.selectbox("Order Priority", ["Low", "Medium", "High", "Urgent"], index=2)
-        with c3:
+        with r1_c3:
             deadline = st.number_input("Delivery Deadline (hrs from now)", min_value=1.0, max_value=72.0, value=12.0, step=1.0)
+
+        # Row 2: Batch Quantity, Priority, and Submit Button (aligned to bottom)
+        r2_c1, r2_c2, r2_c3 = st.columns(3, vertical_alignment="bottom")
+        with r2_c1:
+            qty = st.number_input("Batch Quantity (Units)", min_value=1, max_value=500, value=25, step=5)
+        with r2_c2:
+            prio = st.selectbox("Order Priority", ["Low", "Medium", "High", "Urgent"], index=2)
+        with r2_c3:
             new_oid = db.get_next_order_id()
-            submit_btn = st.form_submit_button("🚀 Submit Order to Shop Floor Backlog", use_container_width=True)
+            submit_btn = st.form_submit_button("🚀 Submit Order to Shop Floor Backlog", use_container_width=True, type="primary")
 
         if submit_btn:
             success = db.add_order(

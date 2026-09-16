@@ -165,7 +165,7 @@ def render_overview_view(simulator, db, theme: Optional[str] = None):
     target_machine_ids = [m["machine_id"] for m in machines] if machines else ["M1-CNC-01"]
     short_map = {mid: mid.split("-")[0] for mid in target_machine_ids}
 
-    ctl_c1, ctl_c2, ctl_c3, ctl_c4 = st.columns([1.4, 1.4, 2.0, 2.0])
+    ctl_c1, ctl_c2, ctl_c3, ctl_c4 = st.columns([1.4, 1.4, 2.0, 2.0], vertical_alignment="center")
     with ctl_c1:
         if st.button("⏩ Step (+0.5h)", use_container_width=True, help="Advance simulation time by 30 minutes"):
             simulator.step(time_delta_hrs=0.5)

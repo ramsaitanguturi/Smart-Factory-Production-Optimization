@@ -216,10 +216,12 @@ html, body, [class*="css"] {
     margin-top: 0.4rem;
 }
 
-.stButton > button {
+.stButton > button,
+div[data-testid="stFormSubmitButton"] > button {
     border-radius: 8px;
     font-weight: 600;
     transition: all 0.2s ease;
+    min-height: 42px;
 }
 """
 
@@ -416,6 +418,41 @@ div[data-baseweb="input"] input {
     background-color: #111827 !important;
     color: #f8fafc !important;
 }
+
+/* Buttons in Dark Mode */
+.stButton > button:not([kind="primary"]),
+div[data-testid="stFormSubmitButton"] > button:not([kind="primary"]) {
+    background-color: #111827 !important;
+    border: 1px solid #334155 !important;
+    color: #e2e8f0 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.stButton > button:not([kind="primary"]):hover,
+div[data-testid="stFormSubmitButton"] > button:not([kind="primary"]):hover {
+    background-color: #1e293b !important;
+    border-color: #38bdf8 !important;
+    color: #38bdf8 !important;
+}
+
+.stButton > button[kind="primary"],
+div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
+    background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(56, 189, 248, 0.4) !important;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35) !important;
+}
+
+.stButton > button[kind="primary"] *,
+div[data-testid="stFormSubmitButton"] > button[kind="primary"] * {
+    color: #ffffff !important;
+}
+
+.stButton > button[kind="primary"]:hover,
+div[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%) !important;
+    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4) !important;
+}
 """
 
 LIGHT_THEME_CSS = """
@@ -541,27 +578,31 @@ div[data-testid="stAlert"] span {
 }
 
 /* Buttons in Light Mode */
-.stButton > button:not([kind="primary"]) {
+.stButton > button:not([kind="primary"]),
+div[data-testid="stFormSubmitButton"] > button:not([kind="primary"]) {
     background-color: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
     color: #1e293b !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.03);
 }
 
-.stButton > button:not([kind="primary"]):hover {
+.stButton > button:not([kind="primary"]):hover,
+div[data-testid="stFormSubmitButton"] > button:not([kind="primary"]):hover {
     background-color: #f8fafc !important;
     border-color: #0284c7 !important;
     color: #0284c7 !important;
 }
 
-.stButton > button[kind="primary"] {
+.stButton > button[kind="primary"],
+div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
     background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
     color: #ffffff !important;
     border: none !important;
     box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25) !important;
 }
 
-.stButton > button[kind="primary"] * {
+.stButton > button[kind="primary"] *,
+div[data-testid="stFormSubmitButton"] > button[kind="primary"] * {
     color: #ffffff !important;
 }
 
