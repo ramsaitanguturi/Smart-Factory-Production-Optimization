@@ -15,7 +15,7 @@ import pandas as pd
 
 from config import (
     MACHINES, PRIORITY_WEIGHTS, STATUS_NORMAL,
-    STATUS_WARNING, STATUS_CRITICAL, STATUS_FAILED
+    STATUS_WARNING, STATUS_CRITICAL, STATUS_FAILED, STATUS_MAINTENANCE
 )
 from database.db_manager import DatabaseManager
 from models.energy_model import EnergyPredictionModel
@@ -38,7 +38,7 @@ class ProductionScheduler:
         return (
             m_info.get("failure_prob", 0.0) > 0.35
             or m_info.get("health_score", 100.0) < 60.0
-            or m_info.get("status") in (STATUS_CRITICAL, STATUS_FAILED)
+            or m_info.get("status") in (STATUS_CRITICAL, STATUS_FAILED, STATUS_MAINTENANCE)
         )
 
     def build_naive_baseline_schedule(
@@ -55,7 +55,12 @@ class ProductionScheduler:
         # Exclude completed orders from baseline scheduling (BUG-12)
         orders = [o for o in orders if o.get("status") != "Completed"]
         machine_lookup = {m["machine_id"]: m for m in machines}
-        machine_timelines: Dict[str, float] = {m["machine_id"]: max(0.0, float(current_time)) for m in machines}
+        machine_timelines: Dict[str, float] = {}
+        for m in machines:
+            base_t = max(0.0, float(current_time))
+            if m.get("status") == STATUS_MAINTENANCE:
+                base_t += float(m.get("maintenance_remaining_hrs", 2.0))
+            machine_timelines[m["machine_id"]] = base_t
         
         scheduled_orders = []
         total_tardiness = 0.0
@@ -176,6 +181,13 @@ class ProductionScheduler:
         HORIZON_UNITS = HORIZON_HRS * TIME_SCALE
         s_min_units = int(round(max(0.0, float(current_time)) * TIME_SCALE))
 
+        # Earliest available start time per machine (accounting for clock and maintenance downtime AUDIT-MED-03)
+        machine_s_min: Dict[str, int] = {}
+        for m in machines:
+            mid = m["machine_id"]
+            m_delay = float(m.get("maintenance_remaining_hrs", 2.0)) if m.get("status") == STATUS_MAINTENANCE else 0.0
+            machine_s_min[mid] = int(round((max(0.0, float(current_time)) + m_delay) * TIME_SCALE))
+
         all_machines_by_type: Dict[str, List[str]] = {}
         for m in machines:
             all_machines_by_type.setdefault(m["type"], []).append(m["machine_id"])
@@ -208,10 +220,11 @@ class ProductionScheduler:
             assigned_bools = []
             for mid in eligible_mids:
                 m_info = machine_lookup[mid]
+                m_start_min = machine_s_min.get(mid, s_min_units)
 
                 b = model.NewBoolVar(f"x_{oid}_{mid}")
-                s = model.NewIntVar(s_min_units, HORIZON_UNITS, f"s_{oid}_{mid}")
-                e = model.NewIntVar(s_min_units, HORIZON_UNITS, f"e_{oid}_{mid}")
+                s = model.NewIntVar(m_start_min, HORIZON_UNITS, f"s_{oid}_{mid}")
+                e = model.NewIntVar(m_start_min, HORIZON_UNITS, f"e_{oid}_{mid}")
                 itv = model.NewOptionalIntervalVar(s, p_time_units, e, b, f"itv_{oid}_{mid}")
 
                 x[(oid, mid)] = b
@@ -259,6 +272,8 @@ class ProductionScheduler:
             # Risk penalty: insurmountable penalty if machine is failed, steep quadratic if critical
             if m_info["status"] == STATUS_FAILED:
                 risk_penalty = 50000  # Insurmountable penalty: only assigned if no alternative machine
+            elif m_info["status"] == STATUS_MAINTENANCE:
+                risk_penalty = 12000  # High penalty: machine currently under maintenance
             elif m_info["status"] == STATUS_CRITICAL or m_fail_prob > 0.50:
                 risk_penalty = 8000  # Extreme disincentive
             elif m_info["status"] == STATUS_WARNING or m_fail_prob > 0.25 or m_health < 70.0:

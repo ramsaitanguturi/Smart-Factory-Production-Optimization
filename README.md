@@ -5,7 +5,7 @@
 [![Google OR-Tools](https://img.shields.io/badge/OR--Tools-CP--SAT-orange.svg)](https://developers.google.com/optimization)
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.4%2B-green.svg)](https://scikit-learn.org/)
 [![Theme: Dark SCADA & Clean Light](https://img.shields.io/badge/Themes-Dark%20SCADA%20%7C%20Clean%20Light-blueviolet.svg)]()
-[![Tests: 29 Passed](https://img.shields.io/badge/Tests-29%20Passed%20(100%25)-brightgreen.svg)]()
+[![Tests: 30 Passed](https://img.shields.io/badge/Tests-30%20Passed%20(100%25)-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 [![Status: Production Ready](https://img.shields.io/badge/Status-Semester%20Submission%20Ready-brightgreen.svg)]()
 
@@ -14,7 +14,7 @@ An enterprise-grade, software-only **Industry 4.0 Digital Twin and Operational D
 > 📖 **Comprehensive Academic Documentation:**
 > - [PROJECT_REPORT.md](PROJECT_REPORT.md): 19-section academic capstone project report.
 > - [docs/EXPERIMENTAL_RESULTS.md](docs/EXPERIMENTAL_RESULTS.md): Verified benchmark experiments across Scenarios 1–4.
-> - [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md): 29-test automated regression test logs.
+> - [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md): 30-test automated regression test logs.
 > - [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md): Comprehensive system inventory & defect resolution audit.
 > - [GUIDE.md](GUIDE.md): Plain-English operational walkthrough.
 
@@ -228,14 +228,14 @@ python train_models.py
 ```
 
 *Results achieved during training:*
-- **Accuracy:** 99.94%
-- **Precision:** 100.00%
-- **Recall:** 99.55%
-- **F1-Score:** 99.77%
-- **ROC-AUC:** 1.0000
-- **RUL RMSE:** 150.8 hours
+- **Accuracy:** 99.69%
+- **Precision:** 99.09%
+- **Recall:** 98.64%
+- **F1-Score:** 98.87%
+- **ROC-AUC:** 0.9993
+- **RUL RMSE:** 12.27 hours ($R^2 = 0.9971$)
 
-### 4. Run Automated Test Verification Suite (21 Comprehensive Tests)
+### 4. Run Automated Test Verification Suite (30 Comprehensive Tests)
 Verify all subsystems (SQLite schema, Physics Telemetry, PdM Inference, Failure Injection, Maintenance Restoration, Simulator Clock, Concurrency, and Google OR-Tools Solver):
 
 ```bash
@@ -244,13 +244,15 @@ python test_system.py
 
 *Output:*
 ```text
-Ran 21 tests in 6.680s: OK (21 passed, 0 failed)
+Ran 30 tests in 27.254s: OK (30 passed, 0 failed, 100% pass rate)
 [PASS] DB seeded with 6 machines and 12 orders
 [PASS] Physics Telemetry generation within calibrated thermodynamic tolerances
 [PASS] XGBoost PdM failure classifier & Random Forest RUL inference
 [PASS] Fault injection & maintenance restoration lifecycle
-[PASS] Google OR-Tools CP-SAT multi-objective solver convergence (< 50ms)
+[PASS] Google OR-Tools CP-SAT multi-objective solver convergence (< 60ms)
 [PASS] Dark SCADA & Clean Light theme palettes and CSS generation
+[PASS] Simulation order eligibility, multi-job carry-forward, & tariff integration
+[PASS] Maintenance downtime scheduling constraints enforced
 ```
 
 ### 5. Launch the Dashboard Locally
@@ -298,11 +300,12 @@ This repository is pre-configured for one-click deployment on **Streamlit Commun
 | **Energy Reduction under Anomaly** | **Up to 9.0%** | Evacuates high-friction machines & shifts off-peak |
 
 ### Top Predictive Feature Importances:
-1. **Vibration (mm/s RMS)**: ~48.6% (Bearing wear, spindle eccentricity)
-2. **Temperature (°C)**: ~27.8% (Coolant loss, thermal dissipation failure)
-3. **Pressure (bar)**: ~12.4% (Hydraulic seal degradation)
-4. **Operating Hours**: ~8.6% (Weibull fatigue accumulation)
-5. **Power Draw (kW)**: ~1.6% (Mechanical friction overhead)
+1. **Vibration (mm/s RMS)**: ~44.6% (Bearing wear, spindle eccentricity)
+2. **Temperature (°C)**: ~27.4% (Coolant loss, thermal dissipation failure)
+3. **Pressure (bar)**: ~17.5% (Hydraulic seal degradation)
+4. **Operating Hours**: ~7.8% (Weibull fatigue accumulation)
+5. **Load Factor**: ~1.9% (Duty cycle torque stress)
+6. **Power Draw (kW)**: ~0.3% (Mechanical friction overhead)
 
 ---
 

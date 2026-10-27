@@ -408,7 +408,7 @@ Open your terminal or PowerShell in the project directory:
 # 1. Install required packages
 pip install -r requirements.txt
 
-# 2. Run the automated test verification suite (all 21 tests pass)
+# 2. Run the automated test verification suite (all 30 tests pass)
 python test_system.py
 
 # 3. Launch the dashboard

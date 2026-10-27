@@ -94,100 +94,88 @@ The data flow within the system forms a complete closed-loop cyber-physical cont
 
 ---
 
-## 4. Defect Classification & New Audit Findings
+## 4. Defect Classification, Remediation & Verification
 
-### Critical Severity Defects (Must be fixed for operational validity)
+### Critical Severity Defects (Operational Validity)
 
 #### AUDIT-CRIT-01: Premature Execution of Future Orders via Fallback Bypass in `step()`
-- **Subsystem**: Factory Simulation (`simulation/factory_simulator.py`, lines 351–357)
-- **Defect Description**:
-  ```python
-  sched = [o for o in m_orders if o["status"] == "Scheduled"]
-  sched.sort(key=lambda o: (float(o.get("scheduled_start_hrs", 0.0)), float(o.get("deadline_hrs", 999.0))))
-  eligible = [o for o in sched if float(o.get("scheduled_start_hrs", 0.0)) <= self.simulation_time_hrs]
-  current_order = eligible[0] if eligible else sched[0] if sched else None
-  ```
-  When no scheduled order on a machine has reached its scheduled start time (`eligible` is empty because all orders are scheduled for future hours, e.g., $T+12\text{h}$), the fallback `else sched[0]` selects the future order immediately.
-- **Root Cause**: An incorrect fallback was retained from an earlier draft that bypassed the start-time eligibility check.
-- **Impact**: Future orders scheduled hours or days ahead begin processing immediately while the machine is simulated as idle in lines 104–112 (idle power draw), violating schedule integrity.
-- **Remediation**: Remove `sched[0]` fallback: `current_order = eligible[0] if eligible else None`.
+- **Subsystem**: Factory Simulation (`simulation/factory_simulator.py`, lines 368–374)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_15_order_queueing_and_concurrency`)
+- **Remediation Implemented**: Removed `else sched[0]` bypass so future orders remain queued until simulation clock advances to their `scheduled_start_hrs`.
 
 #### AUDIT-CRIT-02: Lost Machine Time on Multi-Hour Simulation Steps
-- **Subsystem**: Factory Simulation (`simulation/factory_simulator.py`, lines 358–378)
-- **Defect Description**: If an order has $0.5\text{h}$ remaining and the user steps the simulation by $+2.0\text{h}$, the order completes, but the loop terminates for that machine on that tick. The remaining $1.5\text{h}$ of available machine processing capacity during that step is lost.
-- **Impact**: Fast-forwarding simulation ticks causes machine throughput to under-report relative to elapsed simulation hours.
-- **Remediation**: Implement a multi-job progression loop per machine that carries forward remaining step time to subsequent eligible queued orders.
+- **Subsystem**: Factory Simulation (`simulation/factory_simulator.py`, lines 359–406)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_23_multi_job_simulation_step_carry_forward`)
+- **Remediation Implemented**: Implemented `while rem_step_budget > 0.001:` loop per machine. When an order completes mid-step, its remaining time is set to 0.0, status marked `Completed`, and remaining time budget is immediately applied to the next eligible scheduled order on the machine.
 
 ---
 
-### High Severity Defects (Affects core optimization & calculations)
+### High Severity Defects (Core Optimization & Calculations)
 
 #### AUDIT-HIGH-01: Point-in-Time Discrete Tariff Calculation in `step()` Cumulative Cost
-- **Subsystem**: Energy Analytics (`simulation/factory_simulator.py`, lines 311–313)
-- **Defect Description**:
-  ```python
-  sim_h = self.simulation_time_hrs % 24.0
-  step_tariff = ENERGY_PEAK_TARIFF if (14.0 <= sim_h <= 19.0) else ENERGY_OFFPEAK_TARIFF
-  self.cumulative_cost_usd += (step_kwh * step_tariff)
-  ```
-  While `models/energy_model.py` was fixed to use exact continuous interval overlap, `step()` in the simulator evaluated the tariff using a single discrete sample at the end of the step.
-- **Impact**: Stepping across tariff boundaries (e.g. from 13.0h to 15.0h) charges the entire 2-hour energy consumption at the peak tariff ($0.28/kWh) rather than splitting between off-peak and peak.
-- **Remediation**: Use exact continuous peak ratio calculation for the step interval `[sim_time - delta, sim_time]`.
+- **Subsystem**: Energy Analytics (`simulation/factory_simulator.py`, lines 312–328)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_24_step_continuous_tariff_integration`)
+- **Remediation Implemented**: Replaced discrete point-in-time tariff sampling with continuous 1D interval overlap calculus across the peak tariff window ($14:00 - 19:00$), calculating exact time-weighted effective tariffs.
 
 #### AUDIT-HIGH-02: Absence of Simulation Clock Awareness in Production Scheduler
-- **Subsystem**: Production Scheduling (`optimization/scheduler.py`, line 210)
-- **Defect Description**:
-  `s = model.NewIntVar(0, HORIZON_UNITS, f"s_{oid}_{mid}")`
-  The decision variable allows start times beginning at $0.0$, regardless of current simulation time.
-- **Impact**: When an operator re-optimizes the factory at $T = 6.0\text{h}$, the optimizer schedules jobs to start at $T = 0.0\text{h}$ (in the past relative to the simulation clock).
-- **Remediation**: Add `current_time: float = 0.0` parameter to `optimize_schedule` and `build_naive_baseline_schedule`, enforcing $s \ge \text{current\_time}$.
+- **Subsystem**: Production Scheduling (`optimization/scheduler.py`, lines 177, 213–214)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_25_scheduler_simulation_clock_offset`)
+- **Remediation Implemented**: Added `current_time: float = 0.0` parameter to `optimize_schedule` and `build_naive_baseline_schedule`, enforcing start time lower bound $s \ge \text{current\_time}$.
 
 #### AUDIT-HIGH-03: In-Progress Status Inconsistency on Machine Reallocation
-- **Subsystem**: Optimization & Database (`optimization/scheduler.py` line 362, `database/db_manager.py` line 244)
-- **Defect Description**: When an in-flight order on a degraded machine is reallocated to a backup machine where it is scheduled to start in the future ($s > \text{current\_time}$), leaving its status as `In-Progress` causes single-machine concurrency violations on the backup workstation.
-- **Remediation**: Update order status to `'Scheduled'` when reassigned with a future start time.
+- **Subsystem**: Optimization & Database (`optimization/scheduler.py`, lines 374–376)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_27_scheduler_reallocation_status_transition`)
+- **Remediation Implemented**: When an order is reallocated with a future start time ($s > \text{current\_time} + 0.05\text{h}$), its database status is transitioned to `'Scheduled'` so it does not run prematurely or concurrently.
 
 ---
 
-### Medium Severity Defects (Visual, semantic, and boundary handling)
+### Medium Severity Defects (Visual, Semantic, and Boundary Handling)
 
 #### AUDIT-MED-01: Negative Late Orders Badge Formatting in Comparison Cards
-- **Subsystem**: UI Components (`ui/components.py`, line 348)
-- **Defect Description**: When the optimizer intentionally trades off minor tardiness on a low-priority job to avoid a catastrophic machine breakdown on an expensive machine, `del_prevented` can be negative (e.g., -1). The UI rendered `▼ -1 Late Orders Prevented` in green.
-- **Remediation**: Handle zero and negative deltas gracefully with appropriate semantic labeling (e.g., `▲ 1 Delayed for Machine Protection` in amber).
+- **Subsystem**: UI Components (`ui/components.py`, lines 348–355)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_21_production_order_table_rendering`)
+- **Remediation Implemented**: Handled negative deltas cleanly, rendering `▲ X Shifted for Health` in amber to represent intentional trade-offs rather than displaying negative numbers in green.
 
 #### AUDIT-MED-02: Input Validation Gaps in `DatabaseManager.add_order()`
-- **Subsystem**: Database (`database/db_manager.py`, lines 198–214)
-- **Defect Description**: `add_order()` did not validate that `quantity > 0`, `processing_time_hrs > 0`, and `deadline_hrs > 0`.
-- **Remediation**: Add validation assertions and reject non-positive values before executing SQL statements.
+- **Subsystem**: Database (`database/db_manager.py`, lines 201–210)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_22_database_input_validation`)
+- **Remediation Implemented**: Added parameter validation to `add_order()` rejecting non-positive quantities, non-positive processing times, non-positive deadlines, and empty IDs before executing SQL.
 
 #### AUDIT-MED-03: Missing Machine Downtime Awareness During Maintenance in CP-SAT
-- **Subsystem**: Optimization (`optimization/scheduler.py`)
-- **Defect Description**: If a workstation is currently undergoing maintenance with $1.5\text{h}$ remaining, CP-SAT could schedule an order to start immediately on that machine at $T = 0$.
-- **Remediation**: Incorporate remaining maintenance duration into machine earliest start time bounds.
+- **Subsystem**: Optimization (`optimization/scheduler.py`, lines 40, 58, 179–185, 208, 258)
+- **Status**: **RESOLVED & VERIFIED** (Regression test: `test_30_maintenance_downtime_scheduling`)
+- **Remediation Implemented**: Incorporated remaining maintenance duration into machine earliest start time bounds ($s_m \ge \text{current\_time} + \text{downtime}$) and assigned high risk penalty ($12,000$) for machines in `MAINTENANCE`.
 
 ---
 
-### Low Severity Defects (Cleanliness, documentation, and configuration)
+### Low Severity Defects (Cleanliness, Documentation, and Configuration)
 
 #### AUDIT-LOW-01: Discrepancy Between Documented ML Metrics and Serialized Model Metrics
 - **Subsystem**: Documentation (`README.md`, `PROJECT_REPORT.md`, `ui/views/model_metrics.py`)
-- **Defect Description**: Documented metrics reported an older benchmark ($R^2 = 0.59$, $\text{RMSE} = 150.8\text{h}$, accuracy $99.94\%$), whereas the active serialized model artifact (`pdm_metrics.joblib`) achieves $R^2 = 0.997$, $\text{RMSE} = 12.27\text{h}$, accuracy $99.69\%$.
-- **Remediation**: Synchronize all documentation, tables, and fallback default dictionaries with the verified serialized model metrics.
+- **Status**: **RESOLVED & VERIFIED** (Verified against `models/saved/pdm_metrics.joblib`)
+- **Remediation Implemented**: Synchronized all documentation, tables, and fallback default dictionaries to match actual serialized artifact metrics: Accuracy 99.69%, Precision 99.09%, Recall 98.64%, F1 98.87%, ROC-AUC 0.9993, RUL RMSE 12.27h ($R^2 = 0.9971$).
 
 #### AUDIT-LOW-02: Missing SQLite Temporary File Patterns in `.gitignore`
 - **Subsystem**: Git Configuration (`.gitignore`)
-- **Defect Description**: SQLite WAL mode creates `*.db-wal` and `*.db-shm` temporary files during runtime that were not explicitly listed in `.gitignore`.
-- **Remediation**: Add `*.db-wal`, `*.db-shm`, and `*.db-journal` to `.gitignore`.
+- **Status**: **RESOLVED & VERIFIED**
+- **Remediation Implemented**: Added `*.db-wal`, `*.db-shm`, and `*.db-journal` to `.gitignore`.
 
 ---
 
-## 5. Audit Summary by Severity
+## 5. Audit Summary by Severity & Resolution Status
 
-| Severity Level | Count | Action Required |
-| :--- | :--- | :--- |
-| **Critical** | 2 | Immediate code fix in simulation order progression and eligibility logic. |
-| **High** | 3 | Fix continuous step tariff integration, schedule clock awareness, and reallocation state transitions. |
-| **Medium** | 3 | Fix comparison card badge sign handling, DB input validation, and maintenance downtime bounds. |
-| **Low** | 2 | Synchronize ML metrics documentation and update `.gitignore`. |
-| **Total** | **10** | Comprehensive remediation plan established. |
+| Defect ID | Severity | Description | Final Status | Verification Test |
+| :--- | :--- | :--- | :---: | :--- |
+| **AUDIT-CRIT-01** | Critical | Future order execution bypass in simulation `step()` | **RESOLVED** | `test_15_order_queueing_and_concurrency` |
+| **AUDIT-CRIT-02** | Critical | Multi-hour step budget loss on job completion | **RESOLVED** | `test_23_multi_job_simulation_step_carry_forward` |
+| **AUDIT-HIGH-01** | High | Discrete tariff point-sampling in `step()` | **RESOLVED** | `test_24_step_continuous_tariff_integration` |
+| **AUDIT-HIGH-02** | High | Optimizer clock blindness scheduling in past | **RESOLVED** | `test_25_scheduler_simulation_clock_offset` |
+| **AUDIT-HIGH-03** | High | In-progress status inconsistency on reallocation | **RESOLVED** | `test_27_scheduler_reallocation_status_transition` |
+| **AUDIT-MED-01** | Medium | Negative delta formatting on trade-off metrics | **RESOLVED** | `test_21_production_order_table_rendering` |
+| **AUDIT-MED-02** | Medium | Missing parameter validation in `add_order()` | **RESOLVED** | `test_22_database_input_validation` |
+| **AUDIT-MED-03** | Medium | Maintenance downtime unawareness in CP-SAT | **RESOLVED** | `test_30_maintenance_downtime_scheduling` |
+| **AUDIT-LOW-01** | Low | ML metrics documentation drift | **RESOLVED** | Verified against `pdm_metrics.joblib` |
+| **AUDIT-LOW-02** | Low | Missing SQLite WAL temp files in `.gitignore` | **RESOLVED** | Added to `.gitignore` |
+
+**Final Audit Verdict:** 10 out of 10 audit findings have been remediated, covered with automated tests, and verified in active code. Zero unresolved defects remain.
+

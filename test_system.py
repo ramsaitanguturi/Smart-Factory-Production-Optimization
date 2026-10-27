@@ -723,6 +723,26 @@ class TestSmartFactorySystem(unittest.TestCase):
         self.assertNotIn(test_order_id, scheduled_order_ids, f"Completed order {test_order_id} must not be re-scheduled!")
         print(" [PASS] Scheduler exclusion: Verified completed orders are excluded from scheduling allocations.")
 
+    def test_30_maintenance_downtime_scheduling(self):
+        """Verify scheduler respects maintenance downtime and prevents scheduling jobs during active maintenance (AUDIT-MED-03)."""
+        self.db.reset_to_defaults()
+        machines = self.db.get_machines()
+        for m in machines:
+            if m["machine_id"] == "M1-CNC-01":
+                m["status"] = "MAINTENANCE"
+                m["maintenance_remaining_hrs"] = 3.0
+                
+        result = self.scheduler.optimize_schedule(machines=machines, current_time=0.0)
+        self.assertIn("OPTIMAL", result["solver_status"])
+        
+        for alloc in result["optimized"]["scheduled_orders"]:
+            if alloc["assigned_machine_id"] == "M1-CNC-01":
+                self.assertGreaterEqual(
+                    alloc["scheduled_start_hrs"],
+                    3.0 - 1e-4,
+                    f"Job {alloc['order_id']} scheduled on M1 at {alloc['scheduled_start_hrs']} during active maintenance (< 3.0h)!"
+                )
+        print(" [PASS] Maintenance downtime constraint: Verified jobs on maintenance machines start >= remaining downtime.")
 
 
 if __name__ == "__main__":

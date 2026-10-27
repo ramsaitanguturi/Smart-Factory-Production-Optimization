@@ -19,7 +19,7 @@ This project designs, implements, validates, and benchmarks the **Smart Factory 
 3. A **Multi-Objective Mathematical Optimizer** powered by **Google OR-Tools CP-SAT** formulates production scheduling as a constrained combinatorial optimization problem, minimizing weighted tardiness, catastrophic machine breakdown risk, makespan, and peak-tariff electricity costs.
 4. An **Industrial SCADA Web Interface** built on Streamlit and Plotly delivers real-time digital-twin telemetry visualization, interactive What-If scenario injection, and schedule reallocation tracking.
 
-Empirical validation across deterministic workloads confirms that under machine degradation, the CP-SAT optimizer successfully **eliminates 100% of high-risk machine assignments**, saves up to **9.0% in electrical energy consumption**, and solves in **under 60 milliseconds**. A 29-test automated regression suite achieves a **100% pass rate**.
+Empirical validation across deterministic workloads confirms that under machine degradation, the CP-SAT optimizer successfully **eliminates 100% of high-risk machine assignments**, saves up to **9.0% in electrical energy consumption**, and solves in **under 60 milliseconds**. A 30-test automated regression suite achieves a **100% pass rate**.
 
 ---
 
@@ -296,7 +296,7 @@ For any processing interval $[t_{\text{start}}, t_{\text{end}}]$, the continuous
 
 ## 12. Experimental Setup
 
-Experiments were executed on an isolated Python 3.12 environment with deterministic initial states using `scratch/run_experiments.py`:
+Experiments were executed on an isolated Python 3.12 environment with deterministic initial states using `experiments/run_experiments.py` (and `scratch/run_experiments.py`):
 - **Workload A (Nominal):** 12 production orders across all 6 healthy machines.
 - **Workload B (Single Anomaly):** Coolant Failure injected on `M1-CNC-01` (temperature $> 100^\circ\text{C}$, $\mathcal{P}_{\text{fail}} > 0.95$).
 - **Workload C (Heavy Stress):** 15 orders (including 3 surge urgent orders) with dual machine degradation (`M1-CNC-01` Coolant Failure and `M3-ROB-01` Bearing Wear).
@@ -339,15 +339,16 @@ The baseline uses an industrial dispatching queue:
 
 ## 15. Testing and Validation
 
-The automated verification suite (`test_system.py`) contains **29 unit and integration tests** covering:
+The automated verification suite (`test_system.py`) contains **30 unit and integration tests** covering:
 - Database schema, CHECK constraints, and input validation.
 - Telemetry physics, limits, and degradation curves.
 - ML classification, regression, and defensive domain bounds.
 - Simulation step progression, multi-job carry-forward, and fault recovery.
 - CP-SAT interval feasibility, clock offset, non-overlap, and completed-order exclusion.
 - Dynamic Light and Dark SCADA UI CSS generation and Plotly themes.
+- Machine maintenance downtime scheduling lower bound constraints.
 
-**Execution Result:** `Ran 29 tests in 13.975s: OK (29 passed, 0 failed, 100% pass rate)`.
+**Execution Result:** `Ran 30 tests in 27.254s: OK (30 passed, 0 failed, 100% pass rate)`.
 
 ---
 
@@ -369,7 +370,7 @@ The automated verification suite (`test_system.py`) contains **29 unit and integ
 
 ## 18. Conclusion
 
-This project successfully proves that combining Condition-Based Predictive Maintenance with Google OR-Tools CP-SAT multi-objective mathematical optimization yields significant industrial advantages over legacy scheduling heuristics. The implemented system eliminates 100% of high-risk machine assignments under degradation, reduces electricity consumption by up to 9.0%, guarantees non-overlapping schedule feasibility, and solves in under 60 milliseconds. The project is fully implemented, verified with 29 automated tests, documented, and ready for university semester submission.
+This project successfully proves that combining Condition-Based Predictive Maintenance with Google OR-Tools CP-SAT multi-objective mathematical optimization yields significant industrial advantages over legacy scheduling heuristics. The implemented system eliminates 100% of high-risk machine assignments under degradation, reduces electricity consumption by up to 9.0%, guarantees non-overlapping schedule feasibility, and solves in under 60 milliseconds. The project is fully implemented, verified with 30 automated tests, documented, and ready for university semester submission.
 
 ---
 

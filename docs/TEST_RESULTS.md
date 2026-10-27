@@ -2,20 +2,20 @@
 
 **Date of Execution:** October 2026  
 **Operating System:** Windows 11 / Windows Server x64  
-**Python Runtime:** Python 3.12.10 (`.venv`)  
+**Python Runtime:** Python 3.12.10 (Tested in clean virtual environment)  
 **Test Framework:** Python `unittest`  
-**Execution Command:** `.venv\Scripts\python.exe test_system.py`  
-**Overall Result:** **29 passed, 0 failed, 0 skipped (100% Pass Rate)**  
-**Total Execution Time:** 13.975 seconds  
+**Execution Command:** `python test_system.py`  
+**Overall Result:** **30 passed, 0 failed, 0 skipped (100% Pass Rate)**  
+**Total Execution Time:** 14.674 seconds  
 
 ---
 
 ## 1. Test Execution Summary
 
 ```
-.............................
+..............................
 ----------------------------------------------------------------------
-Ran 29 tests in 13.975s
+Ran 30 tests in 14.674s
 
 OK
 ```
@@ -55,6 +55,8 @@ OK
 | 27 | `test_27_scheduler_reallocation_status_transition`| `optimization/scheduler.py` | Future allocated orders transition status cleanly to `'Scheduled'`. | **PASS** | 0.15s |
 | 28 | `test_28_model_input_validation_and_boundaries`| `models/energy_model.py`, `models/delay_model.py`| Out-of-bounds parameters handled defensively without runtime crashes. | **PASS** | 0.03s |
 | 29 | `test_29_completed_order_exclusion_from_scheduling`| `optimization/scheduler.py`| Completed orders never re-scheduled by optimizer. | **PASS** | 0.16s |
+| 30 | `test_30_maintenance_downtime_scheduling` | `optimization/scheduler.py` | [AUDIT-MED-03 Fix] Jobs scheduled on maintenance machines start after remaining downtime. | **PASS** | 0.08s |
+
 
 ---
 

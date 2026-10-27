@@ -5,7 +5,7 @@
 **Execution Runtime:** Python 3.12.10 (`.venv`)  
 **Solver Engine:** Google OR-Tools CP-SAT (Constraint Programming - Satisfiability) v9.8+  
 **Machine Learning Engine:** Scikit-Learn Random Forest Classifier & Gradient Boosting Regressor  
-**Reproducibility Script:** `scratch/run_experiments.py`  
+**Reproducibility Script:** `experiments/run_experiments.py` (version-controlled; also available at `scratch/run_experiments.py`)  
 
 ---
 
@@ -136,4 +136,4 @@ Actual Failure               3                218
 ---
 
 ## 4. Verification Check
-Every number in this document was directly generated from running `.venv\Scripts\python.exe scratch/run_experiments.py` and `test_system.py`. Zero numbers were fabricated.
+Every number in this document was directly generated from running `python experiments/run_experiments.py` (or `python scratch/run_experiments.py`) and `test_system.py`. Zero numbers were fabricated.
