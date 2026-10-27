@@ -2,16 +2,21 @@
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
-[![Google OR-Tools](https://img.shields.io/badge/OR--Tools-9.15-orange.svg)](https://developers.google.com/optimization)
-[![XGBoost](https://img.shields.io/badge/XGBoost-3.4-green.svg)](https://xgboost.readthedocs.io/)
+[![Google OR-Tools](https://img.shields.io/badge/OR--Tools-CP--SAT-orange.svg)](https://developers.google.com/optimization)
+[![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.4%2B-green.svg)](https://scikit-learn.org/)
 [![Theme: Dark SCADA & Clean Light](https://img.shields.io/badge/Themes-Dark%20SCADA%20%7C%20Clean%20Light-blueviolet.svg)]()
-[![Tests: 21 Passed](https://img.shields.io/badge/Tests-21%20Passed-brightgreen.svg)]()
+[![Tests: 29 Passed](https://img.shields.io/badge/Tests-29%20Passed%20(100%25)-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Industrial%20Grade-brightgreen.svg)]()
+[![Status: Production Ready](https://img.shields.io/badge/Status-Semester%20Submission%20Ready-brightgreen.svg)]()
 
 An enterprise-grade, software-only **Industry 4.0 Digital Twin and Operational Decision Support System**. It integrates physics-informed machine degradation simulation, Machine Learning predictive maintenance (PdM), Remaining Useful Life (RUL) regression, production order delay risk forecasting, load-dependent dynamic energy modeling, and **Google OR-Tools CP-SAT multi-objective mathematical optimization**.
 
-> 📖 **Looking for a beginner-friendly, plain-English walkthrough?** Check out the exhaustive [Plain-English Operational Guide (GUIDE.md)](GUIDE.md) explaining how every subsystem, screen, button, and AI model works without complicated jargon.
+> 📖 **Comprehensive Academic Documentation:**
+> - [PROJECT_REPORT.md](PROJECT_REPORT.md): 19-section academic capstone project report.
+> - [docs/EXPERIMENTAL_RESULTS.md](docs/EXPERIMENTAL_RESULTS.md): Verified benchmark experiments across Scenarios 1–4.
+> - [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md): 29-test automated regression test logs.
+> - [docs/FINAL_AUDIT.md](docs/FINAL_AUDIT.md): Comprehensive system inventory & defect resolution audit.
+> - [GUIDE.md](GUIDE.md): Plain-English operational walkthrough.
 
 ---
 
@@ -284,11 +289,13 @@ This repository is pre-configured for one-click deployment on **Streamlit Commun
 
 | Metric | Score | Description |
 | :--- | :--- | :--- |
-| **Accuracy** | **99.94%** | Test set classification accuracy |
-| **Precision** | **100.00%** | Zero false alarms under nominal conditions |
-| **Recall** | **99.55%** | Captures 99.5%+ of impending degradation events |
-| **ROC-AUC** | **1.0000** | Perfect separation across decision thresholds |
-| **Solver Speed** | **< 50 ms** | Google OR-Tools CP-SAT optimal schedule convergence |
+| **Fault Classification Accuracy** | **99.69%** | Held-out test set accuracy (1,600 unseen cycles) |
+| **Precision / Recall / F1** | **99.09% / 98.64% / 98.87%** | Near-zero false alarms with 98.6%+ fault detection |
+| **ROC-AUC** | **0.9993** | Superior separation across decision thresholds |
+| **RUL Prognostics ($R^2$ / RMSE)** | **0.9971 / 12.27 hrs** | Highly accurate Remaining Useful Life forecasting |
+| **CP-SAT Solver Speed** | **< 60 ms** | Real-time multi-objective mathematical convergence |
+| **Catastrophic Risk Avoidance** | **100.0%** | Zero high-risk jobs assigned under anomaly conditions |
+| **Energy Reduction under Anomaly** | **Up to 9.0%** | Evacuates high-friction machines & shifts off-peak |
 
 ### Top Predictive Feature Importances:
 1. **Vibration (mm/s RMS)**: ~48.6% (Bearing wear, spindle eccentricity)

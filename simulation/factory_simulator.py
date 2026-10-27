@@ -304,12 +304,27 @@ class FactorySimulator:
         if telemetry_batch:
             self.db.record_telemetry_batch(telemetry_batch)
 
-        # Accumulate factory energy and power cost for this step
+        # Accumulate factory energy and power cost for this step using exact continuous peak overlap
         step_kw_sum = sum(upd["telemetry"]["power_kw"] for upd in updates)
         step_kwh = step_kw_sum * time_delta_hrs
         self.cumulative_energy_kwh += step_kwh
-        sim_h = self.simulation_time_hrs % 24.0
-        step_tariff = ENERGY_PEAK_TARIFF if (14.0 <= sim_h <= 19.0) else ENERGY_OFFPEAK_TARIFF
+
+        # Calculate exact continuous overlap hours with peak window [14.0, 19.0] during this step
+        step_start_h = self.simulation_time_hrs - time_delta_hrs
+        rem_step_d = time_delta_hrs
+        total_peak_step_hrs = 0.0
+        cur_t = step_start_h
+        while rem_step_d > 0.0001:
+            day_s = cur_t % 24.0
+            chunk = min(rem_step_d, 24.0 - day_s)
+            day_e = day_s + chunk
+            overlap = max(0.0, min(day_e, 19.0) - max(day_s, 14.0))
+            total_peak_step_hrs += overlap
+            cur_t += chunk
+            rem_step_d -= chunk
+
+        peak_step_ratio = min(1.0, max(0.0, total_peak_step_hrs / max(0.001, time_delta_hrs)))
+        step_tariff = (peak_step_ratio * ENERGY_PEAK_TARIFF) + ((1.0 - peak_step_ratio) * ENERGY_OFFPEAK_TARIFF)
         self.cumulative_cost_usd += (step_kwh * step_tariff)
 
         # Evaluate deadlines for all uncompleted production orders
@@ -320,12 +335,12 @@ class FactorySimulator:
             if self.simulation_time_hrs > dline and o.get("is_delayed", 0) == 0:
                 with self.db.get_connection() as conn:
                     conn.execute(
-                        "UPDATE production_orders SET is_delayed = 1, delay_risk_prob = 1.0 WHERE order_id = ?",
+                        "UPDATE production_orders SET is_delayed = 1, delay_risk_prob = 1.0 WHERE order_id = ? AND status != 'Completed'",
                         (oid,)
                     )
                     conn.commit()
 
-        # Advance in-flight production orders with single-machine concurrency enforcement (BUG-01 & BUG-11)
+        # Advance in-flight production orders with single-machine concurrency enforcement (BUG-01, BUG-11, AUDIT-CRIT-01, AUDIT-CRIT-02)
         active_orders = self.db.get_orders(status="Scheduled") + self.db.get_orders(status="In-Progress")
         
         # Group orders by assigned machine
@@ -341,41 +356,54 @@ class FactorySimulator:
             if not m_info or m_info["status"] not in (STATUS_NORMAL, STATUS_WARNING):
                 continue
 
-            # Prioritize order already In-Progress on this machine
-            in_prog = [o for o in m_orders if o["status"] == "In-Progress"]
-            if in_prog:
-                in_prog.sort(key=lambda o: float(o.get("scheduled_start_hrs", 0.0)))
-                current_order = in_prog[0]
-            else:
-                # Find scheduled order whose start time has arrived, or earliest scheduled order in queue
-                sched = [o for o in m_orders if o["status"] == "Scheduled"]
-                sched.sort(key=lambda o: (float(o.get("scheduled_start_hrs", 0.0)), float(o.get("deadline_hrs", 999.0))))
-                eligible = [o for o in sched if float(o.get("scheduled_start_hrs", 0.0)) <= self.simulation_time_hrs]
-                current_order = eligible[0] if eligible else sched[0] if sched else None
+            rem_step_budget = time_delta_hrs
 
-            if not current_order:
-                continue
+            while rem_step_budget > 0.001:
+                # Prioritize order already In-Progress on this machine
+                in_prog = [o for o in m_orders if o["status"] == "In-Progress"]
+                if in_prog:
+                    in_prog.sort(key=lambda o: float(o.get("scheduled_start_hrs", 0.0)))
+                    current_order = in_prog[0]
+                else:
+                    # Find scheduled order whose start time has arrived
+                    sched = [o for o in m_orders if o["status"] == "Scheduled"]
+                    sched.sort(key=lambda o: (float(o.get("scheduled_start_hrs", 0.0)), float(o.get("deadline_hrs", 999.0))))
+                    eligible = [o for o in sched if float(o.get("scheduled_start_hrs", 0.0)) <= self.simulation_time_hrs]
+                    current_order = eligible[0] if eligible else None
 
-            rem_time = max(0.0, float(current_order["processing_time_hrs"]) - time_delta_hrs)
-            if rem_time <= 0.001:
-                self.db.update_order_status(current_order["order_id"], "Completed")
-                with self.db.get_connection() as conn:
-                    conn.execute(
-                        "UPDATE production_orders SET processing_time_hrs = 0.0 WHERE order_id = ?",
-                        (current_order["order_id"],)
-                    )
-                    conn.execute(
-                        "UPDATE machines SET total_cycles = total_cycles + 1 WHERE machine_id = ?",
-                        (assigned_mid,)
-                    )
-                    conn.commit()
-            else:
-                with self.db.get_connection() as conn:
-                    conn.execute(
-                        "UPDATE production_orders SET processing_time_hrs = ?, status = 'In-Progress' WHERE order_id = ?",
-                        (round(rem_time, 2), current_order["order_id"])
-                    )
-                    conn.commit()
+                if not current_order:
+                    break
+
+                cur_proc_time = float(current_order["processing_time_hrs"])
+                applied_time = min(rem_step_budget, cur_proc_time)
+                new_rem_time = max(0.0, cur_proc_time - applied_time)
+                rem_step_budget -= applied_time
+
+                if new_rem_time <= 0.001:
+                    self.db.update_order_status(current_order["order_id"], "Completed")
+                    with self.db.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE production_orders SET processing_time_hrs = 0.0 WHERE order_id = ?",
+                            (current_order["order_id"],)
+                        )
+                        conn.execute(
+                            "UPDATE machines SET total_cycles = total_cycles + 1 WHERE machine_id = ?",
+                            (assigned_mid,)
+                        )
+                        conn.commit()
+                    # Mark in local copy so it won't be picked again in this step
+                    current_order["status"] = "Completed"
+                    current_order["processing_time_hrs"] = 0.0
+                else:
+                    with self.db.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE production_orders SET processing_time_hrs = ?, status = 'In-Progress' WHERE order_id = ?",
+                            (round(new_rem_time, 2), current_order["order_id"])
+                        )
+                        conn.commit()
+                    current_order["status"] = "In-Progress"
+                    current_order["processing_time_hrs"] = round(new_rem_time, 2)
+                    break
 
         return {
             "simulation_time_hrs": round(self.simulation_time_hrs, 2),

@@ -198,6 +198,17 @@ class DatabaseManager:
     def add_order(self, order_id: str, product_code: str, product_name: str,
                   quantity: int, processing_time_hrs: float, required_machine_type: str,
                   priority: str, deadline_hrs: float) -> bool:
+        if not order_id or not product_code or not required_machine_type:
+            return False
+        try:
+            qty = int(quantity)
+            ptime = float(processing_time_hrs)
+            dline = float(deadline_hrs)
+            if qty <= 0 or ptime <= 0.0 or dline <= 0.0:
+                return False
+        except (ValueError, TypeError):
+            return False
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             try:
@@ -206,8 +217,8 @@ class DatabaseManager:
                         order_id, product_code, product_name, quantity, processing_time_hrs,
                         required_machine_type, priority, deadline_hrs, status
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
-                """, (order_id, product_code, product_name, quantity, processing_time_hrs,
-                      required_machine_type, priority, deadline_hrs))
+                """, (order_id, product_code, product_name, qty, ptime,
+                      required_machine_type, priority, dline))
                 conn.commit()
                 return True
             except sqlite3.IntegrityError:

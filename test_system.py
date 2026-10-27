@@ -524,6 +524,206 @@ class TestSmartFactorySystem(unittest.TestCase):
         self.assertEqual(df.loc[df["Order ID"] == "ORD-TEST-04", "Status"].values[0], "✅ Completed")
         print(" [PASS] BUG-FIX: Production order table rendering and risk badges verified.")
 
+    def test_22_database_input_validation(self):
+        """Verify DatabaseManager rejects negative quantities, processing times, and deadlines."""
+        self.assertFalse(
+            self.db.add_order(
+                order_id="ORD-INV-01",
+                product_code="PRD-01",
+                product_name="Invalid Part",
+                quantity=-5,
+                processing_time_hrs=2.0,
+                required_machine_type="CNC_MILL",
+                priority="Medium",
+                deadline_hrs=10.0
+            )
+        )
+        self.assertFalse(
+            self.db.add_order(
+                order_id="ORD-INV-02",
+                product_code="PRD-01",
+                product_name="Invalid Part",
+                quantity=10,
+                processing_time_hrs=-1.0,
+                required_machine_type="CNC_MILL",
+                priority="Medium",
+                deadline_hrs=10.0
+            )
+        )
+        self.assertFalse(
+            self.db.add_order(
+                order_id="ORD-INV-03",
+                product_code="PRD-01",
+                product_name="Invalid Part",
+                quantity=10,
+                processing_time_hrs=2.0,
+                required_machine_type="CNC_MILL",
+                priority="Medium",
+                deadline_hrs=-5.0
+            )
+        )
+        print(" [PASS] DB input validation: Rejected invalid/negative quantities and durations.")
+
+    def test_23_multi_job_simulation_step_carry_forward(self):
+        """Verify simulator steps handle job completion and start the next job with remaining step time."""
+        self.db.reset_to_defaults()
+        self.simulator.reset()
+        
+        # Clear any pre-seeded orders on M1-CNC-01 to test carry-forward in isolation
+        with self.db.get_connection() as conn:
+            conn.execute("DELETE FROM production_orders WHERE assigned_machine_id = 'M1-CNC-01'")
+            conn.commit()
+        
+        self.db.add_order(
+            order_id="ORD-CARRY-01",
+            product_code="PRD-01",
+            product_name="Quick Part 1",
+            quantity=1,
+            processing_time_hrs=0.4,
+            required_machine_type="CNC_MILL",
+            priority="High",
+            deadline_hrs=5.0
+        )
+        self.db.update_order_assignment("ORD-CARRY-01", "M1-CNC-01", 0.0, 0.4, 0.05, 0, 8.0)
+        self.db.update_order_status("ORD-CARRY-01", "In-Progress")
+
+        self.db.add_order(
+            order_id="ORD-CARRY-02",
+            product_code="PRD-02",
+            product_name="Quick Part 2",
+            quantity=1,
+            processing_time_hrs=1.0,
+            required_machine_type="CNC_MILL",
+            priority="Medium",
+            deadline_hrs=5.0
+        )
+        self.db.update_order_assignment("ORD-CARRY-02", "M1-CNC-01", 0.4, 1.4, 0.05, 0, 20.0)
+        self.db.update_order_status("ORD-CARRY-02", "Scheduled")
+        
+        # Step 1.0 hour. ORD-CARRY-01 needs 0.4h -> finishes, remaining 0.6h applied to ORD-CARRY-02
+        self.simulator.step(time_delta_hrs=1.0)
+        
+        all_orders = {o["order_id"]: o for o in self.db.get_orders()}
+        o1 = all_orders["ORD-CARRY-01"]
+        o2 = all_orders["ORD-CARRY-02"]
+        
+        self.assertEqual(o1["status"], "Completed")
+        self.assertAlmostEqual(o1["processing_time_hrs"], 0.0, places=3)
+        self.assertEqual(o2["status"], "In-Progress")
+        self.assertAlmostEqual(o2["processing_time_hrs"], 0.4, places=3) # 1.0 - 0.6 = 0.4 remaining
+        print(f" [PASS] Simulation multi-job carry-forward: O1 completed, O2 progressed to {o2['processing_time_hrs']} hrs.")
+
+    def test_24_step_continuous_tariff_integration(self):
+        """Verify continuous tariff calculation over intervals spanning base and peak tariff hours."""
+        from config import ENERGY_OFFPEAK_TARIFF, ENERGY_PEAK_TARIFF
+        self.db.reset_to_defaults()
+        self.simulator.reset()
+        self.simulator.simulation_time_hrs = 13.0
+        
+        # Step 2.0 hours (from 13.0 to 15.0).
+        # Base tariff: 13.0-14.0 (1.0 hr @ ENERGY_OFFPEAK_TARIFF). Peak tariff: 14.0-15.0 (1.0 hr @ ENERGY_PEAK_TARIFF).
+        state = self.simulator.step(time_delta_hrs=2.0)
+        
+        self.assertAlmostEqual(self.simulator.simulation_time_hrs, 15.0, places=2)
+        total_kwh = state["cumulative_energy_kwh"]
+        total_cost = state["cumulative_cost_usd"]
+        if total_kwh > 0:
+            effective_rate = total_cost / total_kwh
+            expected_rate = (ENERGY_OFFPEAK_TARIFF + ENERGY_PEAK_TARIFF) / 2.0
+            self.assertTrue(ENERGY_OFFPEAK_TARIFF < effective_rate < ENERGY_PEAK_TARIFF)
+            self.assertAlmostEqual(effective_rate, expected_rate, places=2)
+        print(" [PASS] Tariff boundary integration: Continuous weighted tariff calculated accurately.")
+
+    def test_25_scheduler_simulation_clock_offset(self):
+        """Verify optimizer respects simulation clock and never schedules orders in the past."""
+        self.db.reset_to_defaults()
+        sim_clock = 7.5
+        
+        result = self.scheduler.optimize_schedule(current_time=sim_clock)
+        
+        self.assertIn("OPTIMAL", result["solver_status"])
+        for alloc in result["optimized"]["scheduled_orders"]:
+            self.assertGreaterEqual(
+                alloc["scheduled_start_hrs"],
+                sim_clock - 1e-4,
+                f"Order {alloc['order_id']} scheduled at {alloc['scheduled_start_hrs']} hrs, prior to clock {sim_clock} hrs!"
+            )
+        print(f" [PASS] Scheduler simulation clock offset: All {len(result['optimized']['scheduled_orders'])} allocations start >= {sim_clock} hrs.")
+
+    def test_26_scheduler_no_overlap_validation(self):
+        """Independently verify that no machine has overlapping production intervals."""
+        self.db.reset_to_defaults()
+        result = self.scheduler.optimize_schedule()
+        self.assertIn("OPTIMAL", result["solver_status"])
+        
+        # Group allocations by machine
+        by_machine = {}
+        for alloc in result["optimized"]["scheduled_orders"]:
+            m_id = alloc["assigned_machine_id"]
+            start = alloc["scheduled_start_hrs"]
+            end = alloc["scheduled_end_hrs"]
+            by_machine.setdefault(m_id, []).append((start, end, alloc["order_id"]))
+            
+        # Check pairwise non-overlap for each machine
+        for m_id, intervals in by_machine.items():
+            intervals.sort(key=lambda x: x[0])
+            for i in range(len(intervals) - 1):
+                cur_start, cur_end, cur_id = intervals[i]
+                next_start, next_end, next_id = intervals[i + 1]
+                self.assertLessEqual(
+                    cur_end,
+                    next_start + 1e-4,
+                    f"Overlap detected on {m_id}: {cur_id} [{cur_start}, {cur_end}] overlaps with {next_id} [{next_start}, {next_end}]"
+                )
+        print(f" [PASS] Schedule feasibility: Verified zero machine interval overlaps across all {len(by_machine)} active machines.")
+
+    def test_27_scheduler_reallocation_status_transition(self):
+        """Verify order reallocated to a future time slot transitions status to 'Scheduled'."""
+        self.db.reset_to_defaults()
+        result = self.scheduler.optimize_schedule(commit_to_db=True)
+        
+        orders = self.db.get_orders()
+        for o in orders:
+            if o["status"] != "Completed":
+                if o["scheduled_start_hrs"] > 0.05:
+                    self.assertEqual(o["status"], "Scheduled", f"Order {o['order_id']} starting at {o['scheduled_start_hrs']} should be Scheduled, got {o['status']}")
+                else:
+                    self.assertIn(o["status"], ["In-Progress", "Scheduled"])
+        print(" [PASS] Scheduler reallocation status: Future assigned orders properly set to 'Scheduled'.")
+
+    def test_28_model_input_validation_and_boundaries(self):
+        """Verify Energy and Delay models defensively handle out-of-boundary parameters."""
+        # Energy model clamps negative duration to 0 and out-of-bounds health safely
+        e_zero = self.energy.predict_job_energy(machine_id="M1-CNC-01", processing_time_hrs=-2.0)
+        self.assertEqual(e_zero["total_kwh"], 0.0)
+        
+        e_worn = self.energy.predict_job_energy(machine_id="M1-CNC-01", processing_time_hrs=2.0, health_score=-50.0)
+        self.assertGreater(e_worn["total_kwh"], 0.0)
+
+        # Delay model clamps negative durations and failure probabilities safely
+        d_res = self.delay.predict_delay_risk(
+            processing_time_hrs=-1.0,
+            deadline_hrs=10.0,
+            scheduled_start_hrs=0.0,
+            machine_failure_prob=1.5,
+            machine_health_score=-10.0
+        )
+        self.assertTrue(0.0 <= d_res["delay_probability"] <= 1.0)
+        self.assertEqual(d_res["is_delayed"], 0)
+        print(" [PASS] Model validation: Energy and Delay models defensively clamp out-of-boundary inputs.")
+
+    def test_29_completed_order_exclusion_from_scheduling(self):
+        """Verify completed orders are strictly excluded from optimization allocations."""
+        self.db.reset_to_defaults()
+        test_order_id = "ORD-2024-001"
+        self.db.update_order_status(test_order_id, "Completed")
+        
+        result = self.scheduler.optimize_schedule()
+        scheduled_order_ids = [a["order_id"] for a in result["optimized"]["scheduled_orders"]]
+        self.assertNotIn(test_order_id, scheduled_order_ids, f"Completed order {test_order_id} must not be re-scheduled!")
+        print(" [PASS] Scheduler exclusion: Verified completed orders are excluded from scheduling allocations.")
+
+
 
 if __name__ == "__main__":
     unittest.main()

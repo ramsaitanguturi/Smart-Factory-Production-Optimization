@@ -118,7 +118,7 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
             st.warning("The Delay Prediction Model flags orders queued on `M1-CNC-01` as facing severe tardiness risk due to impending breakdown downtime!")
             scheduler = ProductionScheduler(db=db)
             orders = db.get_orders()
-            baseline = scheduler.build_naive_baseline_schedule(orders, db.get_machines())
+            baseline = scheduler.build_naive_baseline_schedule(orders, db.get_machines(), current_time=simulator.simulation_time_hrs)
             
             m1_orders = [o for o in baseline["scheduled_orders"] if o.get("assigned_machine_id") == "M1-CNC-01"]
             st.markdown(f"**{len(m1_orders)} Orders trapped on degraded machine M1-CNC-01:**")
@@ -132,7 +132,7 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
             st.info("Google OR-Tools CP-SAT multi-objective scheduler formulates an automated reallocation strategy to evacuate orders from `M1-CNC-01` onto healthy peer machine `M2-CNC-02`.")
             scheduler = ProductionScheduler(db=db)
             if st.button("⚡ Execute Automated OR-Tools CP-SAT Reschedule", type="primary", use_container_width=True):
-                res = scheduler.optimize_schedule(commit_to_db=True)
+                res = scheduler.optimize_schedule(commit_to_db=True, current_time=simulator.simulation_time_hrs)
                 st.session_state["guided_opt_result"] = res
                 st.success("Automated rescheduling complete! Orders reallocated away from degraded machine.")
                 st.rerun()
@@ -141,7 +141,7 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
             st.markdown("### Step 8: Generated New Optimized Production Schedule")
             scheduler = ProductionScheduler(db=db)
             if "guided_opt_result" not in st.session_state:
-                st.session_state["guided_opt_result"] = scheduler.optimize_schedule(commit_to_db=True)
+                st.session_state["guided_opt_result"] = scheduler.optimize_schedule(commit_to_db=True, current_time=simulator.simulation_time_hrs)
             
             res = st.session_state["guided_opt_result"]
             st.plotly_chart(
@@ -153,7 +153,7 @@ def render_whatif_view(simulator, db, theme: Optional[str] = None):
             st.markdown("### Step 9: Quantified Before vs. After Optimization Comparison")
             scheduler = ProductionScheduler(db=db)
             if "guided_opt_result" not in st.session_state:
-                st.session_state["guided_opt_result"] = scheduler.optimize_schedule(commit_to_db=False)
+                st.session_state["guided_opt_result"] = scheduler.optimize_schedule(commit_to_db=False, current_time=simulator.simulation_time_hrs)
             
             res = st.session_state["guided_opt_result"]
             render_before_after_comparison(res["baseline"], res["optimized"], res["improvements"], theme=current_theme)

@@ -312,12 +312,22 @@ def render_before_after_comparison(baseline: Dict[str, Any], optimized: Dict[str
         base_tard = baseline.get("total_tardiness_weighted", 0.0)
         opt_tard = optimized.get("total_tardiness_weighted", 0.0)
         saved_tard = improvements.get("delay_saved_hrs", 0.0)
+        tard_after_color = pal["accent_green"] if opt_tard == 0 else pal["accent_amber"] if opt_tard <= base_tard else pal["accent_red"]
+        if saved_tard > 0:
+            tard_badge = f'<div class="improvement-badge">▼ {saved_tard:.1f} hrs Delay Saved</div>'
+        elif base_tard == 0 and opt_tard == 0:
+            tard_badge = f'<div class="improvement-badge" style="color: {pal["accent_green"]}; background: rgba(16, 185, 129, 0.15);">0 Delay (On Schedule)</div>'
+        elif opt_tard > base_tard:
+            tard_badge = f'<div class="improvement-badge" style="color: {pal["accent_amber"]}; background: rgba(245, 158, 11, 0.15);">▲ {opt_tard - base_tard:.1f} hrs Tardiness</div>'
+        else:
+            tard_badge = f'<div class="improvement-badge" style="color: {pal["accent_blue"]}; background: rgba(56, 189, 248, 0.15);">= Preserved Benchmark</div>'
+
         st.markdown(f"""
         <div class="comparison-box">
             <div class="kpi-label">Weighted Tardiness (Delay)</div>
             <div style="font-size: 1.1rem; color: {pal['text_muted']}; text-decoration: line-through;">Before: {base_tard:.1f} hrs</div>
-            <div style="font-size: 1.6rem; font-weight: 700; color: {pal['accent_green']}; font-family: monospace;">After: {opt_tard:.1f} hrs</div>
-            <div class="improvement-badge">▼ {saved_tard:.1f} hrs Delay Saved</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: {tard_after_color}; font-family: monospace;">After: {opt_tard:.1f} hrs</div>
+            {tard_badge}
         </div>
         """, unsafe_allow_html=True)
 
@@ -326,12 +336,19 @@ def render_before_after_comparison(baseline: Dict[str, Any], optimized: Dict[str
         opt_risk = optimized.get("high_risk_assignments", 0)
         avoided_risk = improvements.get("high_risk_jobs_avoided", 0)
         risk_after_color = pal["accent_green"] if opt_risk == 0 else pal["accent_amber"]
+        if avoided_risk > 0:
+            risk_badge = f'<div class="improvement-badge">▼ {avoided_risk} High-Risk Avoided</div>'
+        elif base_risk == 0 and opt_risk == 0:
+            risk_badge = f'<div class="improvement-badge" style="color: {pal["accent_green"]}; background: rgba(16, 185, 129, 0.15);">0 High-Risk (Nominal)</div>'
+        else:
+            risk_badge = f'<div class="improvement-badge" style="color: {pal["accent_blue"]}; background: rgba(56, 189, 248, 0.15);">= {opt_risk} Active Jobs</div>'
+
         st.markdown(f"""
         <div class="comparison-box">
             <div class="kpi-label">Jobs on Degraded Machines</div>
             <div style="font-size: 1.1rem; color: {pal['text_muted']}; text-decoration: line-through;">Before: {base_risk} jobs</div>
             <div style="font-size: 1.6rem; font-weight: 700; color: {risk_after_color}; font-family: monospace;">After: {opt_risk} jobs</div>
-            <div class="improvement-badge">▼ {avoided_risk} High-Risk Avoided</div>
+            {risk_badge}
         </div>
         """, unsafe_allow_html=True)
 
@@ -340,12 +357,21 @@ def render_before_after_comparison(baseline: Dict[str, Any], optimized: Dict[str
         opt_del_orders = optimized.get("delayed_orders_count", 0)
         del_prevented = improvements.get("delayed_orders_prevented", 0)
         del_after_color = pal["accent_green"] if opt_del_orders == 0 else pal["accent_amber"]
+        if del_prevented > 0:
+            del_badge = f'<div class="improvement-badge">▼ {del_prevented} Late Orders Prevented</div>'
+        elif base_del_orders == 0 and opt_del_orders == 0:
+            del_badge = f'<div class="improvement-badge" style="color: {pal["accent_green"]}; background: rgba(16, 185, 129, 0.15);">0 Late (All On-Time)</div>'
+        elif del_prevented < 0:
+            del_badge = f'<div class="improvement-badge" style="color: {pal["accent_amber"]}; background: rgba(245, 158, 11, 0.15);">▲ {abs(del_prevented)} Shifted for Health</div>'
+        else:
+            del_badge = f'<div class="improvement-badge" style="color: {pal["accent_blue"]}; background: rgba(56, 189, 248, 0.15);">= Maintained</div>'
+
         st.markdown(f"""
         <div class="comparison-box">
             <div class="kpi-label">Late Orders Count</div>
             <div style="font-size: 1.1rem; color: {pal['text_muted']}; text-decoration: line-through;">Before: {base_del_orders} orders</div>
             <div style="font-size: 1.6rem; font-weight: 700; color: {del_after_color}; font-family: monospace;">After: {opt_del_orders} orders</div>
-            <div class="improvement-badge">▼ {del_prevented} Late Orders Prevented</div>
+            {del_badge}
         </div>
         """, unsafe_allow_html=True)
 
@@ -353,11 +379,18 @@ def render_before_after_comparison(baseline: Dict[str, Any], optimized: Dict[str
         base_energy = baseline.get("total_energy_kwh", 0.0)
         opt_energy = optimized.get("total_energy_kwh", 0.0)
         saved_energy = improvements.get("energy_saved_kwh", 0.0)
+        if saved_energy > 0:
+            energy_badge = f'<div class="improvement-badge">▼ {saved_energy:.1f} kWh Conserved</div>'
+        elif abs(saved_energy) < 0.01:
+            energy_badge = f'<div class="improvement-badge" style="color: {pal["accent_blue"]}; background: rgba(56, 189, 248, 0.15);">= Equivalent Workload</div>'
+        else:
+            energy_badge = f'<div class="improvement-badge" style="color: {pal["accent_amber"]}; background: rgba(245, 158, 11, 0.15);">▲ {abs(saved_energy):.1f} kWh Added</div>'
+
         st.markdown(f"""
         <div class="comparison-box">
             <div class="kpi-label">Total Energy Consumption</div>
             <div style="font-size: 1.1rem; color: {pal['text_muted']}; text-decoration: line-through;">Before: {base_energy:.1f} kWh</div>
             <div style="font-size: 1.6rem; font-weight: 700; color: {pal['accent_blue']}; font-family: monospace;">After: {opt_energy:.1f} kWh</div>
-            <div class="improvement-badge">▼ {saved_energy:.1f} kWh Conserved</div>
+            {energy_badge}
         </div>
         """, unsafe_allow_html=True)

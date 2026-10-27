@@ -44,7 +44,8 @@ class ProductionScheduler:
     def build_naive_baseline_schedule(
         self,
         orders: List[Dict[str, Any]],
-        machines: List[Dict[str, Any]]
+        machines: List[Dict[str, Any]],
+        current_time: float = 0.0
     ) -> Dict[str, Any]:
         """
         Computes a naive, unoptimized baseline schedule (FIFO order, round-robin assignment
@@ -54,7 +55,7 @@ class ProductionScheduler:
         # Exclude completed orders from baseline scheduling (BUG-12)
         orders = [o for o in orders if o.get("status") != "Completed"]
         machine_lookup = {m["machine_id"]: m for m in machines}
-        machine_timelines: Dict[str, float] = {m["machine_id"]: 0.0 for m in machines}
+        machine_timelines: Dict[str, float] = {m["machine_id"]: max(0.0, float(current_time)) for m in machines}
         
         scheduled_orders = []
         total_tardiness = 0.0
@@ -146,7 +147,8 @@ class ProductionScheduler:
         orders: Optional[List[Dict[str, Any]]] = None,
         machines: Optional[List[Dict[str, Any]]] = None,
         max_solve_time_sec: float = 4.0,
-        commit_to_db: bool = True
+        commit_to_db: bool = True,
+        current_time: float = 0.0
     ) -> Dict[str, Any]:
         """
         Runs OR-Tools CP-SAT multi-objective optimization to assign orders
@@ -163,7 +165,7 @@ class ProductionScheduler:
         machine_lookup = {m["machine_id"]: m for m in machines}
         
         # Calculate Naive Baseline first
-        baseline = self.build_naive_baseline_schedule(orders, machines)
+        baseline = self.build_naive_baseline_schedule(orders, machines, current_time=current_time)
 
         # Build OR-Tools CP-SAT Model
         model = cp_model.CpModel()
@@ -172,6 +174,7 @@ class ProductionScheduler:
         TIME_SCALE = 10
         HORIZON_HRS = 120  # 5-day scheduling horizon
         HORIZON_UNITS = HORIZON_HRS * TIME_SCALE
+        s_min_units = int(round(max(0.0, float(current_time)) * TIME_SCALE))
 
         all_machines_by_type: Dict[str, List[str]] = {}
         for m in machines:
@@ -207,8 +210,8 @@ class ProductionScheduler:
                 m_info = machine_lookup[mid]
 
                 b = model.NewBoolVar(f"x_{oid}_{mid}")
-                s = model.NewIntVar(0, HORIZON_UNITS, f"s_{oid}_{mid}")
-                e = model.NewIntVar(0, HORIZON_UNITS, f"e_{oid}_{mid}")
+                s = model.NewIntVar(s_min_units, HORIZON_UNITS, f"s_{oid}_{mid}")
+                e = model.NewIntVar(s_min_units, HORIZON_UNITS, f"e_{oid}_{mid}")
                 itv = model.NewOptionalIntervalVar(s, p_time_units, e, b, f"itv_{oid}_{mid}")
 
                 x[(oid, mid)] = b
@@ -368,6 +371,9 @@ class ProductionScheduler:
                         is_delayed=delay_out["is_delayed"],
                         energy_kwh=energy_out["total_kwh"]
                     )
+                    # If an order is scheduled for the future on this machine, ensure status is Scheduled
+                    if start_hrs > (current_time + 0.05):
+                        self.db.update_order_status(oid, "Scheduled")
 
             opt_results = {
                 "scheduled_orders": optimized_orders,

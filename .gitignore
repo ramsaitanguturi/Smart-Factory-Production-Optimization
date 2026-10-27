@@ -37,6 +37,11 @@ venv.bak/
 # Streamlit secrets (for private credentials)
 .streamlit/secrets.toml
 
+# SQLite WAL and temporary journal files
+*.db-wal
+*.db-shm
+*.db-journal
+
 # Testing & Coverage
 .pytest_cache/
 .coverage
@@ -56,3 +61,4 @@ Desktop.ini
 *.swp
 *.swo
 *~
+scratch/

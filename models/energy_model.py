@@ -24,6 +24,11 @@ class EnergyPredictionModel:
         Worn machines (lower health_score) suffer increased friction and thermal dissipation losses,
         consuming 5% to 25% more electricity.
         """
+        processing_time_hrs = max(0.0, float(processing_time_hrs))
+        health_score = max(0.0, min(100.0, float(health_score)))
+        load_factor = max(0.0, min(1.5, float(load_factor)))
+        start_hour_of_day = max(0.0, float(start_hour_of_day))
+
         m_cfg = MACHINES.get(machine_id, MACHINES["M1-CNC-01"])
         nominal_kw = m_cfg["nominal_power_kw"]
         idle_kw = m_cfg["idle_power_kw"]

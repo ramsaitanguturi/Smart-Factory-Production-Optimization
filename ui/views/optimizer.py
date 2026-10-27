@@ -46,7 +46,8 @@ def render_optimizer_view(simulator, db, theme: Optional[str] = None):
                     orders=orders,
                     machines=machines,
                     max_solve_time_sec=time_limit,
-                    commit_to_db=commit_to_db
+                    commit_to_db=commit_to_db,
+                    current_time=simulator.simulation_time_hrs
                 )
                 st.session_state["last_optimization_result"] = res
                 st.success(f"Optimal schedule computed in {res['solve_time_ms']} ms! Status: {res['solver_status']}")
@@ -92,7 +93,7 @@ def render_optimizer_view(simulator, db, theme: Optional[str] = None):
         st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, hide_index=True)
     else:
         # Show initial unoptimized baseline
-        baseline = scheduler.build_naive_baseline_schedule(orders, machines)
+        baseline = scheduler.build_naive_baseline_schedule(orders, machines, current_time=simulator.simulation_time_hrs)
         st.info("Showing current unoptimized baseline schedule. Click 'Run AI Production Optimization' above to generate an optimized schedule!")
         st.plotly_chart(
             render_gantt_chart(baseline["scheduled_orders"], title="Current Naive Baseline Schedule (Unoptimized)", theme=current_theme),

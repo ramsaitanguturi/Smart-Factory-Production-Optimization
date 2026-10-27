@@ -23,6 +23,12 @@ class DelayPredictionModel:
         """
         Calculates delay probability and estimated tardiness (hours past deadline).
         """
+        processing_time_hrs = max(0.0, float(processing_time_hrs))
+        deadline_hrs = max(0.0, float(deadline_hrs))
+        scheduled_start_hrs = max(0.0, float(scheduled_start_hrs))
+        machine_failure_prob = max(0.0, min(1.0, float(machine_failure_prob)))
+        machine_health_score = max(0.0, min(100.0, float(machine_health_score)))
+
         scheduled_end = scheduled_start_hrs + processing_time_hrs
         slack_buffer = deadline_hrs - scheduled_end  # Positive = buffer, Negative = delayed already
 

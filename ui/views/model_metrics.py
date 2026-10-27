@@ -36,15 +36,21 @@ def render_model_metrics_view(theme: Optional[str] = None):
     # Top Metrics Row
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
-        st.metric("Model Accuracy", f"{(metrics.get('accuracy', 0.999)*100):.2f}%")
+        st.metric("Model Accuracy", f"{(metrics.get('accuracy', 0.9969)*100):.2f}%")
     with m2:
-        st.metric("Precision", f"{(metrics.get('precision', 1.0)*100):.2f}%")
+        st.metric("Precision", f"{(metrics.get('precision', 0.9909)*100):.2f}%")
     with m3:
-        st.metric("Recall", f"{(metrics.get('recall', 0.995)*100):.2f}%")
+        st.metric("Recall", f"{(metrics.get('recall', 0.9864)*100):.2f}%")
     with m4:
-        st.metric("F1-Score", f"{(metrics.get('f1_score', 0.998)*100):.2f}%")
+        st.metric("F1-Score", f"{(metrics.get('f1_score', 0.9887)*100):.2f}%")
     with m5:
-        st.metric("ROC-AUC", f"{metrics.get('roc_auc', 1.0):.4f}")
+        st.metric("ROC-AUC", f"{metrics.get('roc_auc', 0.9993):.4f}")
+
+    st.markdown("""
+    <div style="font-size: 0.8rem; color: #94a3b8; margin: 4px 0 12px 0;">
+        ℹ️ <i>Notice: Evaluated on 1,600 held-out test samples from a 8,000-record physics-grounded synthetic degradation dataset.</i>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -52,7 +58,7 @@ def render_model_metrics_view(theme: Optional[str] = None):
 
     with col_cm:
         st.markdown("##### 🔲 Confusion Matrix (Test Set)")
-        cm = metrics.get("confusion_matrix", [[1375, 0], [1, 224]])
+        cm = metrics.get("confusion_matrix", [[1377, 2], [3, 218]])
         cm_df = pd.DataFrame(
             cm,
             index=["Actual Normal (0)", "Actual Failure (1)"],
@@ -104,9 +110,9 @@ def render_model_metrics_view(theme: Optional[str] = None):
     st.markdown("##### ⏱️ RUL (Remaining Useful Life) Regression Metrics")
     rc1, rc2, rc3 = st.columns(3)
     with rc1:
-        st.metric("RUL Regressor RMSE", f"{metrics.get('rul_rmse', 150.8):.1f} hours", "Residual Error")
+        st.metric("RUL Regressor RMSE", f"{metrics.get('rul_rmse', 12.27):.2f} hours", "Residual Error")
     with rc2:
-        st.metric("RUL Model R² Score", f"{metrics.get('rul_r2', 0.60):.4f}", "Variance Explained")
+        st.metric("RUL Model R² Score", f"{metrics.get('rul_r2', 0.9971):.4f}", "Variance Explained")
     with rc3:
         st.metric("Training Dataset Size", f"{metrics.get('training_samples', 8000)} records", f"Trained: {metrics.get('trained_at', 'Recent')}")
 
