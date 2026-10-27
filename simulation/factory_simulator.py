@@ -95,6 +95,15 @@ class FactorySimulator:
         advances order execution progress, handles maintenance countdowns,
         and triggers critical failure escalation when neglected.
         """
+        time_delta_hrs = max(0.0, float(time_delta_hrs))
+        if time_delta_hrs <= 0.0:
+            return {
+                "simulation_time_hrs": round(self.simulation_time_hrs, 2),
+                "cumulative_energy_kwh": round(self.cumulative_energy_kwh, 2),
+                "cumulative_cost_usd": round(self.cumulative_cost_usd, 2),
+                "updates": []
+            }
+
         self.simulation_time_hrs += time_delta_hrs
         machines = self.db.get_machines()
         updates = []

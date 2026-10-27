@@ -1,0 +1,10 @@
+Scenario,Strategy,Makespan_hrs,Tardiness_hrs,Delayed_Orders,High_Risk_Jobs,Energy_kWh,Solve_Time_ms
+Scenario 1 (Nominal),Baseline,11.0,0.0,0,0,1089.34,N/A
+Scenario 1 (Nominal),CP-SAT,10.5,0.0,0,0,1079.72,45.7
+Scenario 2 (Coolant Anomaly),Baseline,10.45,0.0,0,2,1065.94,N/A
+Scenario 2 (Coolant Anomaly),CP-SAT,20.4,0.0,0,0,984.01,43.2
+Scenario 3 (Heavy Stress),Baseline,13.9,0.0,0,6,1343.82,N/A
+Scenario 3 (Heavy Stress),CP-SAT,24.4,3.6,1,0,1222.9,51.2
+Scenario 4 (Dispatching),FIFO,10.5,0.0,0,0,1088.65,1.01
+Scenario 4 (Dispatching),EDF,11.0,0.0,0,0,1089.34,0.0
+Scenario 4 (Dispatching),CP-SAT,10.5,0.0,0,0,1078.34,42.9

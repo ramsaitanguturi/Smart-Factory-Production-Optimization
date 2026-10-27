@@ -1,0 +1,128 @@
+{
+  "scenario_1_nominal": {
+    "description": "12 initial orders across 6 healthy machines (100% nominal state)",
+    "baseline": {
+      "makespan_hrs": 11.0,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 0,
+      "energy_kwh": 1089.34,
+      "feasibility_violations": 0
+    },
+    "optimized": {
+      "makespan_hrs": 10.5,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 0,
+      "energy_kwh": 1079.72,
+      "feasibility_violations": 0
+    },
+    "relative_gains_pct": {
+      "makespan_improvement_pct": 4.55,
+      "energy_saved_pct": 0.88,
+      "high_risk_avoidance_pct": 100.0
+    },
+    "improvements": {
+      "delay_saved_hrs": 0.0,
+      "delayed_orders_prevented": 0,
+      "energy_saved_kwh": 9.6,
+      "high_risk_jobs_avoided": 0,
+      "efficiency_gain_pct": 0.0
+    },
+    "solve_time_ms": 45.7,
+    "solver_status": "OPTIMAL"
+  },
+  "scenario_2_coolant_failure": {
+    "description": "M1-CNC-01 experiences Coolant Failure (health drops, failure prob spikes > 0.95)",
+    "baseline": {
+      "makespan_hrs": 10.45,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 2,
+      "energy_kwh": 1065.94,
+      "feasibility_violations": 0
+    },
+    "optimized": {
+      "makespan_hrs": 20.4,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 0,
+      "energy_kwh": 984.01,
+      "feasibility_violations": 0
+    },
+    "relative_gains_pct": {
+      "energy_saved_pct": 7.69,
+      "high_risk_avoidance_pct": 100.0,
+      "high_risk_jobs_avoided": 2
+    },
+    "improvements": {
+      "delay_saved_hrs": 0.0,
+      "delayed_orders_prevented": 0,
+      "energy_saved_kwh": 81.9,
+      "high_risk_jobs_avoided": 2,
+      "efficiency_gain_pct": 0.0
+    },
+    "solve_time_ms": 43.2,
+    "solver_status": "OPTIMAL"
+  },
+  "scenario_3_heavy_stress": {
+    "description": "15 orders (including 3 surge urgent orders) with M1 Coolant Failure & M3 Bearing Wear",
+    "baseline": {
+      "makespan_hrs": 13.9,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 6,
+      "energy_kwh": 1343.82,
+      "feasibility_violations": 0
+    },
+    "optimized": {
+      "makespan_hrs": 24.4,
+      "tardiness_hrs": 3.6,
+      "delayed_orders": 1,
+      "high_risk_assignments": 0,
+      "energy_kwh": 1222.9,
+      "feasibility_violations": 0
+    },
+    "relative_gains_pct": {
+      "energy_saved_pct": 9.0,
+      "high_risk_avoidance_pct": 100.0,
+      "high_risk_jobs_avoided": 6
+    },
+    "improvements": {
+      "delay_saved_hrs": 0.0,
+      "delayed_orders_prevented": -1,
+      "energy_saved_kwh": 120.9,
+      "high_risk_jobs_avoided": 6,
+      "efficiency_gain_pct": 0.0
+    },
+    "solve_time_ms": 51.2,
+    "solver_status": "OPTIMAL"
+  },
+  "scenario_4_dispatching_rules": {
+    "description": "Comparison of classical heuristics (FIFO, EDF) vs CP-SAT Multi-Objective Optimization",
+    "FIFO": {
+      "makespan_hrs": 10.5,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 0,
+      "energy_kwh": 1088.65,
+      "solve_time_ms": 1.01
+    },
+    "EDF": {
+      "makespan_hrs": 11.0,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 0,
+      "energy_kwh": 1089.34,
+      "solve_time_ms": 0.0
+    },
+    "CP_SAT": {
+      "makespan_hrs": 10.5,
+      "tardiness_hrs": 0.0,
+      "delayed_orders": 0,
+      "high_risk_assignments": 0,
+      "energy_kwh": 1078.34,
+      "solve_time_ms": 42.9
+    }
+  }
+}

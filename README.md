@@ -214,10 +214,10 @@ Smart Factory Production Optimization/
 - Google Chrome or Microsoft Edge (for automated screenshot generation)
 
 ### 2. Installation
-Clone or navigate to the project directory and install the required dependencies:
+Clone or navigate to the project directory and install the declared dependencies:
 
 ```bash
-pip install streamlit plotly scikit-learn xgboost ortools pandas numpy scipy playwright
+pip install -r requirements.txt
 ```
 
 ### 3. Train Machine Learning Models (Optional - Pre-trained Artifacts Included)
@@ -228,7 +228,7 @@ python train_models.py
 ```
 
 *Results achieved during training:*
-- **Accuracy:** 99.69%
+- **Accuracy:** 99.69% (1,595 / 1,600 correct on held-out test split)
 - **Precision:** 99.09%
 - **Recall:** 98.64%
 - **F1-Score:** 98.87%
@@ -241,10 +241,11 @@ Verify all subsystems (SQLite schema, Physics Telemetry, PdM Inference, Failure 
 ```bash
 python test_system.py
 ```
+*(Or via pytest: `pytest test_system.py -v`)*
 
 *Output:*
 ```text
-Ran 30 tests in 27.254s: OK (30 passed, 0 failed, 100% pass rate)
+Ran 30 tests in 14.080s: OK (30 passed, 0 failed, 100% pass rate)
 [PASS] DB seeded with 6 machines and 12 orders
 [PASS] Physics Telemetry generation within calibrated thermodynamic tolerances
 [PASS] XGBoost PdM failure classifier & Random Forest RUL inference
@@ -255,7 +256,15 @@ Ran 30 tests in 27.254s: OK (30 passed, 0 failed, 100% pass rate)
 [PASS] Maintenance downtime scheduling constraints enforced
 ```
 
-### 5. Launch the Dashboard Locally
+### 5. Reproduce Benchmark Experiments
+Reproduce baseline (FIFO / EDF / naive) vs. Google OR-Tools CP-SAT optimization across Scenarios 1–4, validate schedule feasibility (0 overlap violations), and export raw results:
+
+```bash
+python experiments/run_experiments.py
+```
+*Exports raw results to `experiments/benchmark_results.json` and `experiments/benchmark_results.csv`.*
+
+### 6. Launch the Dashboard Locally
 Run the Streamlit industrial SCADA dashboard:
 
 ```bash
@@ -265,14 +274,14 @@ streamlit run app.py
 Access the interface in your browser at:
 `http://localhost:8501`
 
-### 6. Automated Screenshot Generation (Optional)
+### 7. Automated Screenshot Generation (Optional)
 Capture all 11 pixel-perfect screenshots across views, inner-scrolled sections, and light theme:
 
 ```bash
 python capture_all_screenshots.py
 ```
 
-### ☁️ 7. Deploy to Streamlit Community Cloud
+### ☁️ 8. Deploy to Streamlit Community Cloud
 This repository is pre-configured for one-click deployment on **Streamlit Community Cloud**:
 1. Push this repository to your **GitHub** account.
 2. Visit [share.streamlit.io](https://share.streamlit.io/) and log in with GitHub.

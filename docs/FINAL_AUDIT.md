@@ -38,7 +38,7 @@ Every subsystem, source file, database operation, mathematical model, and user i
 | `ui/views/whatif.py` | Dashboard View | 10-step guided closed-loop Industry 4.0 demonstration stepper and interactive multi-scenario sandbox. |
 | `ui/views/model_metrics.py` | Dashboard View | ML model governance, confusion matrix heatmap, feature importance rankings, RUL regression metrics, and on-demand browser retraining pipeline. |
 | `train_models.py` | ML Pipeline | Standalone script for synthetic dataset generation, training XGBoost classifier and Random Forest regressor, computing validation metrics, and serializing models. |
-| `test_system.py` | Automated Testing | End-to-end regression and verification suite containing 21 automated unit and integration tests. |
+| `test_system.py` | Automated Testing | End-to-end regression and verification suite containing 30 automated unit and integration tests (100% pass rate). |
 | `capture_all_screenshots.py`| Automation | Headless Chromium automation script via Playwright for capturing pixel-perfect documentation screenshots. |
 
 ---
